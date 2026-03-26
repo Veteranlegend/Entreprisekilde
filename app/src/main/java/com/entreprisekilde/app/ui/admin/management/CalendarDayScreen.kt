@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,7 +47,8 @@ import androidx.compose.ui.unit.sp
 fun CalendarDayScreen(
     selectedDate: String,
     tasksForDay: List<TaskData>,
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onTaskClick: (TaskData) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
@@ -181,8 +182,11 @@ fun CalendarDayScreen(
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(filteredTasks) { task ->
-                        CalendarTaskCard(task = task)
+                    itemsIndexed(filteredTasks) { _, task ->
+                        CalendarTaskCard(
+                            task = task,
+                            onClick = { onTaskClick(task) }
+                        )
                     }
                 }
             }
@@ -205,7 +209,10 @@ fun CalendarDayScreen(
 }
 
 @Composable
-private fun CalendarTaskCard(task: TaskData) {
+private fun CalendarTaskCard(
+    task: TaskData,
+    onClick: () -> Unit = {}
+) {
     val backgroundColor = when (task.status) {
         "Complete" -> Color(0xFF0F8A70)
         else -> Color(0xFFFF6B00)
@@ -225,6 +232,7 @@ private fun CalendarTaskCard(task: TaskData) {
         modifier = Modifier
             .fillMaxWidth()
             .background(backgroundColor, RoundedCornerShape(18.dp))
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -311,7 +319,7 @@ private fun prettyDate(date: String): String {
             java.time.format.TextStyle.FULL,
             java.util.Locale.ENGLISH
         )
-        "$dayName ${parsed.dayOfMonth} ${monthName} ${parsed.year}"
+        "$dayName ${parsed.dayOfMonth} $monthName ${parsed.year}"
     } catch (_: Exception) {
         date
     }

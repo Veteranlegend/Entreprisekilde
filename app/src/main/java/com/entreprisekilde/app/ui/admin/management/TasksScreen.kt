@@ -55,7 +55,8 @@ fun TasksScreen(
     tasks: List<TaskData>,
     onBack: () -> Unit = {},
     onCreateTaskClick: () -> Unit = {},
-    onDeleteTask: (Int) -> Unit = {}
+    onDeleteTask: (Int) -> Unit = {},
+    onTaskClick: (TaskData) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
@@ -133,6 +134,7 @@ fun TasksScreen(
             itemsIndexed(filteredTasks) { _, task ->
                 TaskCard(
                     task = task,
+                    onClick = { onTaskClick(task) },
                     onDeleteClick = {
                         val originalIndex = tasks.indexOf(task)
                         if (originalIndex != -1) {
@@ -174,6 +176,7 @@ fun TasksScreen(
 @Composable
 private fun TaskCard(
     task: TaskData,
+    onClick: () -> Unit = {},
     onDeleteClick: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -189,6 +192,7 @@ private fun TaskCard(
         modifier = Modifier
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .background(Color.White, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
             .padding(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
