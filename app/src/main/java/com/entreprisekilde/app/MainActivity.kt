@@ -13,6 +13,7 @@ import com.entreprisekilde.app.ui.admin.management.CreateTaskScreen
 import com.entreprisekilde.app.ui.admin.management.CreateUserScreen
 import com.entreprisekilde.app.ui.admin.management.EmployeeScreen
 import com.entreprisekilde.app.ui.admin.management.EmployeeUser
+import com.entreprisekilde.app.ui.admin.management.ProfileScreen
 import com.entreprisekilde.app.ui.admin.management.ShiftApprovalStatus
 import com.entreprisekilde.app.ui.admin.management.TaskData
 import com.entreprisekilde.app.ui.admin.management.TaskDetailsScreen
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
                 val taskDetailsBackTarget = remember { mutableStateOf("tasks") }
                 val selectedTimesheetEmployee = remember { mutableStateOf("Rasmus Jensen") }
                 val selectedUser = remember { mutableStateOf<EmployeeUser?>(null) }
+                val profileImageUri = remember { mutableStateOf<String?>(null) }
 
                 val users = remember {
                     mutableStateListOf(
@@ -240,6 +242,23 @@ class MainActivity : ComponentActivity() {
                         },
                         onUsersClick = {
                             currentScreen.value = "employees"
+                        },
+                        onProfileClick = {
+                            currentScreen.value = "profile"
+                        }
+                    )
+
+                    "profile" -> ProfileScreen(
+                        email = "tomas.larsen@entreprisekilde.dk",
+                        firstName = "Tomas",
+                        lastName = "Larsen",
+                        phoneNumber = "1234123456",
+                        profileImageUri = profileImageUri.value,
+                        onProfileImageChange = { newUri ->
+                            profileImageUri.value = newUri
+                        },
+                        onLogoutClick = {
+                            currentScreen.value = "login"
                         }
                     )
 
