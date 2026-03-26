@@ -27,7 +27,10 @@ import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,7 +51,8 @@ fun CalendarScreen(
     onBack: () -> Unit = {},
     onDayClick: (String) -> Unit = {}
 ) {
-    val currentMonth = remember { YearMonth.of(2026, 3) }
+    var currentMonth by remember { mutableStateOf(YearMonth.of(2026, 3)) }
+
     val taskDates = remember(tasks) {
         tasks.mapNotNull { task ->
             parseTaskDate(task.date)
@@ -173,16 +177,22 @@ fun CalendarScreen(
 
                         Icon(
                             imageVector = Icons.Outlined.KeyboardArrowLeft,
-                            contentDescription = null,
-                            tint = Color(0xFF4B5563)
+                            contentDescription = "Previous month",
+                            tint = Color(0xFF4B5563),
+                            modifier = Modifier.clickable {
+                                currentMonth = currentMonth.minusMonths(1)
+                            }
                         )
 
                         Spacer(modifier = Modifier.padding(horizontal = 6.dp))
 
                         Icon(
                             imageVector = Icons.Outlined.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = Color(0xFF4B5563)
+                            contentDescription = "Next month",
+                            tint = Color(0xFF4B5563),
+                            modifier = Modifier.clickable {
+                                currentMonth = currentMonth.plusMonths(1)
+                            }
                         )
                     }
 
@@ -224,7 +234,7 @@ fun CalendarScreen(
                                         Box(modifier = Modifier.size(42.dp))
                                     } else {
                                         val hasTasks = taskDates.contains(date)
-                                        val isSelected = hasTasks && date.dayOfMonth == 14
+                                        val isSelected = hasTasks && date.dayOfMonth == 14 && date.month == currentMonth.month && date.year == currentMonth.year
 
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally,
