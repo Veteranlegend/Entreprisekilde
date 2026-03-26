@@ -2,60 +2,69 @@ package com.entreprisekilde.app.ui.admin.management
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-data class Task(
-    val title: String,
-    val city: String,
-    val date: String,
-    val person: String,
-    var status: String
-)
-
 @Composable
-fun TasksScreen(onBack: () -> Unit = {}) {
-
+fun TasksScreen(
+    tasks: List<TaskData>,
+    onBack: () -> Unit = {},
+    onCreateTaskClick: () -> Unit = {}
+) {
     var searchQuery by remember { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    var containerHeightPx by remember { mutableStateOf(0) }
-
-    val tasks = remember {
-        mutableStateListOf(
-            Task("Painting the Wall", "Roskilde", "08/03/2026", "John", "Pending"),
-            Task("Installation", "Copenhagen", "26/03/2026", "Peter", "In-progress"),
-            Task("Fix Sink Leak", "Valby", "25/02/2026", "John", "In-progress"),
-            Task("Bathroom Renovation", "Lyngby", "14/02/2026", "John", "Complete"),
-            Task("Roof Repair", "Aarhus", "12/04/2026", "Mike", "Pending"),
-            Task("Kitchen Setup", "Odense", "01/05/2026", "Anna", "Complete"),
-            Task("Painting Office", "Copenhagen", "10/06/2026", "John", "Pending"),
-            Task("Floor Fix", "Roskilde", "15/06/2026", "Peter", "In-progress"),
-            Task("Door Install", "Valby", "20/06/2026", "Mike", "Pending"),
-            Task("Lighting Setup", "Lyngby", "22/06/2026", "Anna", "Complete")
-        )
-    }
 
     val filteredTasks = tasks.filter {
         searchQuery.isBlank() ||
-                it.title.contains(searchQuery, true) ||
-                it.city.contains(searchQuery, true) ||
-                it.person.contains(searchQuery, true) ||
-                it.date.contains(searchQuery)
+                it.customer.contains(searchQuery, true) ||
+                it.address.contains(searchQuery, true) ||
+                it.assignTo.contains(searchQuery, true) ||
+                it.date.contains(searchQuery, true) ||
+                it.taskDetails.contains(searchQuery, true)
     }
 
     Column(
@@ -64,23 +73,47 @@ fun TasksScreen(onBack: () -> Unit = {}) {
             .background(Color(0xFFE6DADA))
             .statusBarsPadding()
     ) {
-
-        // HEADER
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFFE0A673))
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.ArrowBack, null, modifier = Modifier.clickable { onBack() })
-            Spacer(modifier = Modifier.width(12.dp))
-            Text("All Tasks", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable { onBack() },
+                tint = Color.Black
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Text(
+                text = "All Tasks",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+
             Spacer(modifier = Modifier.weight(1f))
-            Icon(Icons.Outlined.GridView, null)
+
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.GridView,
+                    contentDescription = null,
+                    tint = Color(0xFF666666)
+                )
+            }
         }
 
-        // SEARCH
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -88,72 +121,21 @@ fun TasksScreen(onBack: () -> Unit = {}) {
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // LIST + TRUE SCROLLBAR
-        Box(
+        LazyColumn(
             modifier = Modifier
                 .weight(1f)
-                .onSizeChanged { containerHeightPx = it.height }
+                .fillMaxWidth()
         ) {
-
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(filteredTasks) { task ->
-                    TaskItem(task)
-                }
-            }
-
-            // 🔥 REAL SCROLL CALCULATION
-            val layoutInfo = listState.layoutInfo
-
-            val totalItems = layoutInfo.totalItemsCount
-            val firstVisible = listState.firstVisibleItemIndex
-            val scrollOffset = listState.firstVisibleItemScrollOffset
-
-            val estimatedItemSize = if (layoutInfo.visibleItemsInfo.isNotEmpty())
-                layoutInfo.visibleItemsInfo.first().size else 1
-
-            val totalScrollPx = totalItems * estimatedItemSize
-            val currentScrollPx = (firstVisible * estimatedItemSize) + scrollOffset
-
-            val progress = if (totalScrollPx == 0) 0f
-            else currentScrollPx.toFloat() / totalScrollPx.toFloat()
-
-            val indicatorHeight = 120f
-            val maxOffset = containerHeightPx - indicatorHeight
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 4.dp)
-                    .width(3.dp)
-                    .fillMaxHeight()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .background(Color.Gray, RoundedCornerShape(10.dp))
-                        .offset {
-                            IntOffset(
-                                x = 0,
-                                y = (progress * maxOffset).toInt()
-                            )
-                        }
-                )
+            items(filteredTasks) { task ->
+                TaskCard(task = task)
             }
         }
 
         Button(
-            onClick = {},
+            onClick = onCreateTaskClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
@@ -163,16 +145,28 @@ fun TasksScreen(onBack: () -> Unit = {}) {
         ) {
             Text("Create a Task", color = Color.Black)
         }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomNavItem("Home", Icons.Outlined.Home, Color.Black)
+            BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, Color(0xFF9F98AA))
+            BottomNavItem("Notification", Icons.Outlined.Inventory2, Color(0xFF9F98AA))
+            BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color(0xFF9F98AA))
+        }
     }
 }
 
 @Composable
-fun TaskItem(task: Task) {
-
+private fun TaskCard(task: TaskData) {
     var expanded by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf(task.status) }
 
-    val statusColor = when (status) {
+    val statusColor = when (task.status) {
         "Pending" -> Color.LightGray
         "In-progress" -> Color(0xFFF2E2A8)
         "Complete" -> Color(0xFFC7EBC4)
@@ -185,9 +179,11 @@ fun TaskItem(task: Task) {
             .background(Color.White, RoundedCornerShape(12.dp))
             .padding(12.dp)
     ) {
-
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(task.title, fontWeight = FontWeight.Bold)
+            Text(
+                text = task.customer,
+                fontWeight = FontWeight.Bold
+            )
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -198,18 +194,18 @@ fun TaskItem(task: Task) {
                         .clickable { expanded = true }
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    Text(status, fontSize = 12.sp)
+                    Text(task.status, fontSize = 12.sp)
                 }
 
                 DropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false }
                 ) {
-                    listOf("Pending", "In-progress", "Complete").forEach {
+                    listOf("Pending", "In-progress", "Complete").forEach { value ->
                         DropdownMenuItem(
-                            text = { Text(it) },
+                            text = { Text(value) },
                             onClick = {
-                                status = it
+                                task.status = value
                                 expanded = false
                             }
                         )
@@ -218,7 +214,7 @@ fun TaskItem(task: Task) {
             }
         }
 
-        Text(task.city)
+        Text(task.address)
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -245,11 +241,34 @@ fun TaskItem(task: Task) {
 
             Icon(Icons.Outlined.AccountCircle, null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(6.dp))
-            Text(task.person)
+            Text(task.assignTo)
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Go")
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null
+            )
         }
+    }
+}
+
+@Composable
+private fun BottomNavItem(
+    label: String,
+    icon: ImageVector,
+    color: Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = color
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = color
+        )
     }
 }

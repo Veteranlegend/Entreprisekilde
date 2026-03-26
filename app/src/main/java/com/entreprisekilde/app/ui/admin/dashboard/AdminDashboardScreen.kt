@@ -9,25 +9,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AddBox
-import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.TaskAlt
-import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.PostAdd
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.SupervisorAccount
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,159 +39,125 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun AdminDashboardScreen(
-    onNavigateToManagement: () -> Unit = {},
-    onNavigateToEmployees: () -> Unit = {},
-    onNavigateToTasks: () -> Unit = {},
-    onNavigateToProfile: () -> Unit = {}
+    onAllTasksClick: () -> Unit = {},
+    onCreateTaskClick: () -> Unit = {}
 ) {
-    val pageBackground = Color(0xFFE7DADA)
-    val headerColor = Color(0xFFDFA676)
-    val whitePanel = Color(0xFFF7F7F7)
-    val bottomInactive = Color(0xFF9E9AA7)
-
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(pageBackground)
+            .background(Color(0xFFE6DADA))
+            .statusBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 26.dp, vertical = 18.dp)
+                .background(Color(0xFFF7F7F7))
         ) {
-            Text(
-                text = "Admin",
-                color = Color(0xFF6F666A),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "9:41 AM",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.Black
+                )
 
-            Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.weight(1f))
+
+                Text(
+                    text = "▮▮▮  ◠  ▱",
+                    fontSize = 13.sp,
+                    color = Color.Black
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFE0A673))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Dashboard",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .background(Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.GridView,
+                        contentDescription = null,
+                        tint = Color(0xFF666666),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
 
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(whitePanel)
+                    .weight(1f)
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "9:41 AM",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
-                    )
+                DashboardButton(
+                    text = "All Tasks",
+                    icon = Icons.Outlined.List,
+                    onClick = onAllTasksClick
+                )
 
-                    Spacer(modifier = Modifier.weight(1f))
+                DashboardButton(
+                    text = "Create Task",
+                    icon = Icons.Outlined.PostAdd,
+                    onClick = onCreateTaskClick
+                )
 
-                    Text(
-                        text = "▮▮▮ ⌁ ▱",
-                        color = Color.Black,
-                        fontSize = 14.sp
-                    )
-                }
+                DashboardButton(
+                    text = "Calender",
+                    icon = Icons.Outlined.CalendarToday
+                )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(headerColor)
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Dashboard",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E2230)
-                    )
+                DashboardButton(
+                    text = "Messages",
+                    icon = Icons.Outlined.ChatBubbleOutline
+                )
 
-                    Spacer(modifier = Modifier.weight(1f))
+                DashboardButton(
+                    text = "Timesheet",
+                    icon = Icons.Outlined.Schedule
+                )
 
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.GridView,
-                            contentDescription = "Grid",
-                            tint = Color(0xFF6A625F)
-                        )
-                    }
-                }
+                DashboardButton(
+                    text = "Users",
+                    icon = Icons.Outlined.SupervisorAccount
+                )
+            }
 
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 28.dp, vertical = 20.dp),
-                    verticalArrangement = Arrangement.Top
-                ) {
-                    DashboardButton(
-                        text = "All Tasks",
-                        icon = Icons.Outlined.TaskAlt,
-                        onClick = onNavigateToTasks
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    DashboardButton(
-                        text = "Create Task",
-                        icon = Icons.Outlined.AddBox,
-                        onClick = onNavigateToTasks
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    DashboardButton(
-                        text = "Calender",
-                        icon = Icons.Outlined.CalendarMonth,
-                        onClick = onNavigateToManagement
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    DashboardButton(
-                        text = "Messages",
-                        icon = Icons.Outlined.ChatBubbleOutline,
-                        onClick = onNavigateToManagement
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    DashboardButton(
-                        text = "Timesheet",
-                        icon = Icons.Outlined.Timer,
-                        onClick = onNavigateToManagement
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    DashboardButton(
-                        text = "Users",
-                        icon = Icons.Outlined.Groups,
-                        onClick = onNavigateToEmployees
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 26.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    BottomNavItem("Home", Icons.Outlined.Home, true, Color.Black, onClick = {})
-                    BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, false, bottomInactive, onClick = {})
-                    BottomNavItem("Notification", Icons.Outlined.Inventory2, false, bottomInactive, onClick = {})
-                    BottomNavItem("Profile", Icons.Outlined.PersonOutline, false, bottomInactive, onClick = onNavigateToProfile)
-                }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BottomNavItem("Home", Icons.Outlined.Home, Color.Black)
+                BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, Color(0xFF9F98AA))
+                BottomNavItem("Notification", Icons.Outlined.Inventory2, Color(0xFF9F98AA))
+                BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color(0xFF9F98AA))
             }
         }
     }
@@ -203,34 +167,29 @@ fun AdminDashboardScreen(
 private fun DashboardButton(
     text: String,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .background(
-                color = Color(0xFF7FA7D8),
-                shape = RoundedCornerShape(11.dp)
-            )
+            .background(Color(0xFF7FA8D6), RoundedCornerShape(12.dp))
             .clickable { onClick() }
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = text,
-            tint = Color.Black,
-            modifier = Modifier.size(24.dp)
+            tint = Color.Black
         )
 
-        Spacer(modifier = Modifier.width(18.dp))
+        Spacer(modifier = Modifier.padding(horizontal = 8.dp))
 
         Text(
             text = text,
-            color = Color.Black,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.Black
         )
     }
 }
@@ -239,28 +198,18 @@ private fun DashboardButton(
 private fun BottomNavItem(
     label: String,
     icon: ImageVector,
-    selected: Boolean,
-    color: Color,
-    onClick: () -> Unit
+    color: Color
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = color,
-            modifier = Modifier.size(22.dp)
+            tint = color
         )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
         Text(
             text = label,
-            color = color,
             fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            color = color
         )
     }
 }
