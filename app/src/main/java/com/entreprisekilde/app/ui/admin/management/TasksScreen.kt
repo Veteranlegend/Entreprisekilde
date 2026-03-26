@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,7 +54,8 @@ import androidx.compose.ui.unit.sp
 fun TasksScreen(
     tasks: List<TaskData>,
     onBack: () -> Unit = {},
-    onCreateTaskClick: () -> Unit = {}
+    onCreateTaskClick: () -> Unit = {},
+    onDeleteTask: (Int) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
@@ -129,8 +130,16 @@ fun TasksScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            items(filteredTasks) { task ->
-                TaskCard(task = task)
+            itemsIndexed(filteredTasks) { _, task ->
+                TaskCard(
+                    task = task,
+                    onDeleteClick = {
+                        val originalIndex = tasks.indexOf(task)
+                        if (originalIndex != -1) {
+                            onDeleteTask(originalIndex)
+                        }
+                    }
+                )
             }
         }
 
@@ -163,7 +172,10 @@ fun TasksScreen(
 }
 
 @Composable
-private fun TaskCard(task: TaskData) {
+private fun TaskCard(
+    task: TaskData,
+    onDeleteClick: () -> Unit = {}
+) {
     var expanded by remember { mutableStateOf(false) }
 
     val statusColor = when (task.status) {
@@ -214,9 +226,11 @@ private fun TaskCard(task: TaskData) {
             }
         }
 
+        Spacer(modifier = Modifier.height(6.dp))
+
         Text(task.address)
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Row(
             modifier = Modifier
@@ -249,6 +263,27 @@ private fun TaskCard(task: TaskData) {
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null
             )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Button(
+                onClick = onDeleteClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFE58C8C)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Delete",
+                    color = Color.Black,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }

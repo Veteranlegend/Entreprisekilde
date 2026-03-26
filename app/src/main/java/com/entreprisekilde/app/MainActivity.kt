@@ -7,7 +7,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.entreprisekilde.app.ui.admin.dashboard.AdminDashboardScreen
+import com.entreprisekilde.app.ui.admin.management.CalendarDayScreen
+import com.entreprisekilde.app.ui.admin.management.CalendarScreen
 import com.entreprisekilde.app.ui.admin.management.CreateTaskScreen
+import com.entreprisekilde.app.ui.admin.management.CreateUserScreen
+import com.entreprisekilde.app.ui.admin.management.EmployeeScreen
 import com.entreprisekilde.app.ui.admin.management.TaskData
 import com.entreprisekilde.app.ui.admin.management.TasksScreen
 import com.entreprisekilde.app.ui.auth.login.LoginScreen
@@ -21,6 +25,7 @@ class MainActivity : ComponentActivity() {
             EntreprisekildeTheme {
 
                 val currentScreen = remember { mutableStateOf("login") }
+                val selectedCalendarDate = remember { mutableStateOf("") }
 
                 val tasks = remember {
                     mutableStateListOf(
@@ -50,30 +55,60 @@ class MainActivity : ComponentActivity() {
                             assignTo = "John",
                             taskDetails = "Renovate bathroom",
                             status = "Complete"
+                        ),
+                        TaskData(
+                            customer = "Fix Sink Leak",
+                            phoneNumber = "11223344",
+                            address = "Office",
+                            date = "14/03/2026",
+                            assignTo = "John",
+                            taskDetails = "Fix kitchen sink leak",
+                            status = "In-progress"
+                        ),
+                        TaskData(
+                            customer = "Fix Sink Leak",
+                            phoneNumber = "55667788",
+                            address = "Office",
+                            date = "14/03/2026",
+                            assignTo = "Peter",
+                            taskDetails = "Replace damaged pipe",
+                            status = "In-progress"
+                        ),
+                        TaskData(
+                            customer = "Fix Sink Leak",
+                            phoneNumber = "99887766",
+                            address = "Office",
+                            date = "14/03/2026",
+                            assignTo = "John",
+                            taskDetails = "Final inspection",
+                            status = "Complete"
                         )
                     )
                 }
 
                 when (currentScreen.value) {
 
-                    // 🔹 Login → Dashboard
                     "login" -> LoginScreen(
                         onLoginClick = {
                             currentScreen.value = "dashboard"
                         }
                     )
 
-                    // 🔹 Dashboard
                     "dashboard" -> AdminDashboardScreen(
                         onAllTasksClick = {
                             currentScreen.value = "tasks"
                         },
                         onCreateTaskClick = {
                             currentScreen.value = "createTask"
+                        },
+                        onCalendarClick = {
+                            currentScreen.value = "calendar"
+                        },
+                        onUsersClick = {
+                            currentScreen.value = "employees"
                         }
                     )
 
-                    // 🔹 All Tasks (with back to dashboard)
                     "tasks" -> TasksScreen(
                         tasks = tasks,
                         onBack = {
@@ -81,10 +116,14 @@ class MainActivity : ComponentActivity() {
                         },
                         onCreateTaskClick = {
                             currentScreen.value = "createTask"
+                        },
+                        onDeleteTask = { index ->
+                            if (index in tasks.indices) {
+                                tasks.removeAt(index)
+                            }
                         }
                     )
 
-                    // 🔹 Create Task
                     "createTask" -> CreateTaskScreen(
                         onBack = {
                             currentScreen.value = "dashboard"
@@ -92,6 +131,43 @@ class MainActivity : ComponentActivity() {
                         onCreateTask = { newTask ->
                             tasks.add(0, newTask)
                             currentScreen.value = "tasks"
+                        }
+                    )
+
+                    "employees" -> EmployeeScreen(
+                        onBack = {
+                            currentScreen.value = "dashboard"
+                        },
+                        onCreateUserClick = {
+                            currentScreen.value = "createUser"
+                        }
+                    )
+
+                    "createUser" -> CreateUserScreen(
+                        onBack = {
+                            currentScreen.value = "employees"
+                        },
+                        onAddUserClick = {
+                            currentScreen.value = "employees"
+                        }
+                    )
+
+                    "calendar" -> CalendarScreen(
+                        tasks = tasks,
+                        onBack = {
+                            currentScreen.value = "dashboard"
+                        },
+                        onDayClick = { date: String ->
+                            selectedCalendarDate.value = date
+                            currentScreen.value = "calendarDay"
+                        }
+                    )
+
+                    "calendarDay" -> CalendarDayScreen(
+                        selectedDate = selectedCalendarDate.value,
+                        tasksForDay = tasks.filter { it.date == selectedCalendarDate.value },
+                        onBack = {
+                            currentScreen.value = "calendar"
                         }
                     )
                 }

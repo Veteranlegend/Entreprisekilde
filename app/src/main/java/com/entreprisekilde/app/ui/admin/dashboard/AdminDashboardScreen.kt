@@ -40,7 +40,9 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun AdminDashboardScreen(
     onAllTasksClick: () -> Unit = {},
-    onCreateTaskClick: () -> Unit = {}
+    onCreateTaskClick: () -> Unit = {},
+    onCalendarClick: () -> Unit = {},
+    onUsersClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -127,7 +129,8 @@ fun AdminDashboardScreen(
 
                 DashboardButton(
                     text = "Calender",
-                    icon = Icons.Outlined.CalendarToday
+                    icon = Icons.Outlined.CalendarToday,
+                    onClick = onCalendarClick
                 )
 
                 DashboardButton(
@@ -142,7 +145,8 @@ fun AdminDashboardScreen(
 
                 DashboardButton(
                     text = "Users",
-                    icon = Icons.Outlined.SupervisorAccount
+                    icon = Icons.Outlined.SupervisorAccount,
+                    onClick = onUsersClick
                 )
             }
 

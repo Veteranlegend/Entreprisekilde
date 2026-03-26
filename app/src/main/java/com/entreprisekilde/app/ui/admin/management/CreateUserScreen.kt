@@ -1,12 +1,9 @@
 package com.entreprisekilde.app.ui.admin.management
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,19 +12,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.SupervisorAccount
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -46,33 +42,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-data class EmployeeUser(
-    val id: Int,
-    val name: String
-)
-
 @Composable
-fun EmployeeScreen(
+fun CreateUserScreen(
     onBack: () -> Unit = {},
-    onCreateUserClick: () -> Unit = {},
-    onUserClick: (EmployeeUser) -> Unit = {}
+    onAddUserClick: () -> Unit = {}
 ) {
-    var searchText by remember { mutableStateOf("") }
-
-    val users = remember {
-        listOf(
-            EmployeeUser(1, "Rasmus Jensen"),
-            EmployeeUser(2, "Rasmus Jensen"),
-            EmployeeUser(3, "Rasmus Jensen"),
-            EmployeeUser(4, "Rasmus Jensen"),
-            EmployeeUser(5, "Rasmus Jensen"),
-            EmployeeUser(6, "Rasmus Jensen")
-        )
-    }
-
-    val filteredUsers = users.filter {
-        it.name.contains(searchText, ignoreCase = true)
-    }
+    var email by remember { mutableStateOf("tomas.larsen@entreprisekilde.dk") }
+    var firstName by remember { mutableStateOf("Tomas") }
+    var lastName by remember { mutableStateOf("Larsen") }
+    var phoneNumber by remember { mutableStateOf("1234123456") }
 
     Column(
         modifier = Modifier
@@ -130,7 +108,7 @@ fun EmployeeScreen(
                     }
 
                     Text(
-                        text = "Users",
+                        text = "Create User",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
@@ -154,87 +132,63 @@ fun EmployeeScreen(
                 }
             }
 
-            TextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = "Search",
-                        tint = Color.Black
-                    )
-                },
-                placeholder = {
-                    Text(
-                        text = "Search",
-                        color = Color(0xFF8E8E93),
-                        fontSize = 14.sp
-                    )
-                },
-                shape = RoundedCornerShape(18.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF0F0F0),
-                    unfocusedContainerColor = Color(0xFFF0F0F0),
-                    disabledContainerColor = Color(0xFFF0F0F0),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent,
-                    focusedTextColor = Color.Black,
-                    unfocusedTextColor = Color.Black
-                ),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 14.dp)
-            )
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = 6.dp,
-                    bottom = 24.dp
-                )
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 26.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(filteredUsers) { user ->
-                    UserCard(
-                        user = user,
-                        onClick = { onUserClick(user) }
-                    )
-                }
+                FancyInputField(
+                    label = "Email address",
+                    value = email,
+                    onValueChange = { email = it }
+                )
 
-                item {
-                    Spacer(modifier = Modifier.padding(top = 18.dp))
-                }
+                FancyInputField(
+                    label = "First name",
+                    value = firstName,
+                    onValueChange = { firstName = it }
+                )
 
-                item {
-                    Box(
+                FancyInputField(
+                    label = "Last name",
+                    value = lastName,
+                    onValueChange = { lastName = it }
+                )
+
+                FancyPhoneField(
+                    label = "Phone number",
+                    value = phoneNumber,
+                    onValueChange = { phoneNumber = it }
+                )
+
+                Spacer(modifier = Modifier.weight(1f, fill = true))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp, vertical = 18.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 44.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Color(0xFF7FA8D6),
-                                    RoundedCornerShape(18.dp)
-                                )
-                                .clickable { onCreateUserClick() }
-                                .padding(vertical = 18.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Create User",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.Black
+                            .background(
+                                Color(0xFF7FA8D6),
+                                RoundedCornerShape(20.dp)
                             )
-                        }
+                            .padding(vertical = 22.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Add User",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            modifier = Modifier.padding(0.dp)
+                        )
                     }
                 }
             }
@@ -257,53 +211,81 @@ fun EmployeeScreen(
 }
 
 @Composable
-private fun UserCard(
-    user: EmployeeUser,
-    onClick: () -> Unit
+private fun FancyInputField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF7F7F7), RoundedCornerShape(18.dp))
-            .border(
-                width = 1.dp,
-                color = Color(0xFFD9D9D9),
-                shape = RoundedCornerShape(18.dp)
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color(0xFFD3D8E1),
+            unfocusedContainerColor = Color(0xFFD3D8E1),
+            disabledContainerColor = Color(0xFFD3D8E1),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.Black,
+            unfocusedTextColor = Color.Black
+        ),
+        label = {
+            Text(
+                text = label,
+                color = Color(0xFF8F99A7)
             )
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(54.dp)
-                .background(Color(0xFFB7DDFC), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.SupervisorAccount,
-                contentDescription = null,
-                tint = Color(0xFF49A7EE),
-                modifier = Modifier.size(30.dp)
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun FancyPhoneField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        leadingIcon = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = Color(0xFF8F99A7)
+                )
+                Text(
+                    text = "|",
+                    color = Color(0xFF8F99A7),
+                    fontSize = 22.sp
+                )
+            }
+        },
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color(0xFFD3D8E1),
+            unfocusedContainerColor = Color(0xFFD3D8E1),
+            disabledContainerColor = Color(0xFFD3D8E1),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.Black,
+            unfocusedTextColor = Color.Black
+        ),
+        label = {
+            Text(
+                text = label,
+                color = Color(0xFF8F99A7)
             )
-        }
-
-        Spacer(modifier = Modifier.padding(horizontal = 10.dp))
-
-        Text(
-            text = user.name,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black,
-            modifier = Modifier.weight(1f)
-        )
-
-        Text(
-            text = "›",
-            fontSize = 28.sp,
-            color = Color(0xFF9A9A9A)
-        )
-    }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
