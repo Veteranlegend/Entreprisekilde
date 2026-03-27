@@ -8,14 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -23,16 +24,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.ModeEdit
-import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ModeEdit
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -50,10 +46,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.entreprisekilde.app.ui.components.AppBottomNavBar
+import com.entreprisekilde.app.ui.components.BottomNavDestination
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -77,11 +74,16 @@ data class TimesheetEntry(
 fun TimesheetScreen(
     employeeName: String,
     timesheets: List<TimesheetEntry>,
+    unreadNotificationCount: Int = 0,
     onBack: () -> Unit = {},
     onApproveEntry: (Int) -> Unit = {},
     onDeclineEntry: (Int) -> Unit = {},
     onDeleteEntry: (Int) -> Unit = {},
-    onAssignShift: (TimesheetEntry) -> Unit = {}
+    onAssignShift: (TimesheetEntry) -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     var searchText by remember { mutableStateOf("") }
     var showAssignDialog by remember { mutableStateOf(false) }
@@ -100,229 +102,193 @@ fun TimesheetScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE6DADA))
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .background(Color(0xFFF7F7F7))
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF7F7F7))
+                .fillMaxWidth()
+                .background(Color(0xFFE0A673))
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "9:41 AM",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black
-                )
+                    .size(24.dp)
+                    .clickable { onBack() },
+                tint = Color.Black
+            )
 
-                Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(12.dp))
 
-                Text(
-                    text = "▮▮▮  ◠  ▱",
-                    fontSize = 13.sp,
-                    color = Color.Black
-                )
-            }
+            Text(
+                text = employeeName,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
 
-            Row(
+            Spacer(modifier = Modifier.weight(1f))
+
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFE0A673))
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(42.dp)
+                    .background(Color.White, CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable { onBack() },
-                    tint = Color.Black
+                    imageVector = Icons.Outlined.ModeEdit,
+                    contentDescription = null,
+                    tint = Color(0xFF666666)
                 )
+            }
+        }
 
-                Spacer(modifier = Modifier.width(10.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = "Timesheet",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Search"
+                    )
+                },
+                placeholder = { Text("Search") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White
+                )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = employeeName,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    text = "${filteredEntries.size} Results",
+                    fontSize = 15.sp,
+                    color = Color(0xFF222222)
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.ModeEdit,
-                        contentDescription = null,
-                        tint = Color(0xFF666666)
-                    )
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
                 Text(
-                    text = "Timesheet",
-                    fontSize = 19.sp,
+                    text = "Submitted:",
+                    fontSize = 14.sp,
+                    color = Color(0xFF7A7A7A)
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Text(
+                    text = "${totalSubmittedHours} hrs",
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = searchText,
-                    onValueChange = { searchText = it },
-                    singleLine = true,
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = "Search"
-                        )
-                    },
-                    placeholder = { Text("Search") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFFF4F4F4),
-                        unfocusedContainerColor = Color(0xFFF4F4F4),
-                        disabledContainerColor = Color(0xFFF4F4F4)
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "${filteredEntries.size} Results",
-                        fontSize = 16.sp,
-                        color = Color(0xFF222222)
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Text(
-                        text = "Submitted:",
-                        fontSize = 16.sp,
-                        color = Color(0xFF7A7A7A)
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = "${totalSubmittedHours} hrs",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Text(
-                        text = "Assigned:",
-                        fontSize = 16.sp,
-                        color = Color(0xFF7A7A7A)
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = "${totalAssignedHours} hrs",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    itemsIndexed(filteredEntries) { _, entry ->
-                        val originalIndex = timesheets.indexOf(entry)
-                        TimesheetCard(
-                            entry = entry,
-                            onApprove = {
-                                if (originalIndex != -1) onApproveEntry(originalIndex)
-                            },
-                            onDecline = {
-                                if (originalIndex != -1) onDeclineEntry(originalIndex)
-                            },
-                            onDelete = {
-                                if (originalIndex != -1) onDeleteEntry(originalIndex)
-                            }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = { showAssignDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(58.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF55A8E3),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Add,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Assign Shift",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = "Assigned:",
+                    fontSize = 14.sp,
+                    color = Color(0xFF7A7A7A)
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Text(
+                    text = "${totalAssignedHours} hrs",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                itemsIndexed(filteredEntries) { _, entry ->
+                    val originalIndex = timesheets.indexOf(entry)
+                    TimesheetCard(
+                        entry = entry,
+                        onApprove = {
+                            if (originalIndex != -1) onApproveEntry(originalIndex)
+                        },
+                        onDecline = {
+                            if (originalIndex != -1) onDeclineEntry(originalIndex)
+                        },
+                        onDelete = {
+                            if (originalIndex != -1) onDeleteEntry(originalIndex)
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Button(
+                onClick = { showAssignDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF55A8E3),
+                    contentColor = Color.White
+                )
             ) {
-                BottomNavItem("Home", Icons.Outlined.Home, Color.Black)
-                BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, Color(0xFF9F98AA))
-                BottomNavItem("Notification", Icons.Outlined.Inventory2, Color(0xFF9F98AA))
-                BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color(0xFF9F98AA))
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Assign Shift",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
+
+        AppBottomNavBar(
+            selectedItem = BottomNavDestination.HOME,
+            unreadNotificationCount = unreadNotificationCount,
+            onHomeClick = onHomeClick,
+            onMessagesClick = onMessagesClick,
+            onNotificationsClick = onNotificationsClick,
+            onProfileClick = onProfileClick
+        )
     }
 
     if (showAssignDialog) {
@@ -530,7 +496,11 @@ private fun AssignShiftDialog(
     onDismiss: () -> Unit,
     onAssign: (TimesheetEntry) -> Unit
 ) {
-    var date by remember { mutableStateOf(LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))) }
+    var date by remember {
+        mutableStateOf(
+            LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+        )
+    }
     var fromTime by remember { mutableStateOf("09:30 AM") }
     var toTime by remember { mutableStateOf("06:30 PM") }
     var assignedHours by remember { mutableStateOf("9") }
@@ -618,25 +588,5 @@ private fun prettyTimesheetDate(date: String): String {
         }
     } catch (_: Exception) {
         date
-    }
-}
-
-@Composable
-private fun BottomNavItem(
-    label: String,
-    icon: ImageVector,
-    color: Color
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = color
-        )
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = color
-        )
     }
 }

@@ -7,23 +7,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,10 +33,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.entreprisekilde.app.ui.components.AppBottomNavBar
+import com.entreprisekilde.app.ui.components.BottomNavDestination
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -48,8 +48,13 @@ import java.util.Locale
 @Composable
 fun CalendarScreen(
     tasks: List<TaskData>,
+    unreadNotificationCount: Int = 0,
     onBack: () -> Unit = {},
-    onDayClick: (String) -> Unit = {}
+    onDayClick: (String) -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     var currentMonth by remember { mutableStateOf(YearMonth.of(2026, 3)) }
 
@@ -73,235 +78,199 @@ fun CalendarScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE6DADA))
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .background(Color(0xFFF7F7F7))
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF7F7F7))
+                .fillMaxWidth()
+                .background(Color(0xFFE0A673))
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "9:41 AM",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black
-                )
+                    .size(24.dp)
+                    .clickable { onBack() },
+                tint = Color.Black
+            )
 
-                Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(12.dp))
 
-                Text(
-                    text = "▮▮▮  ◠  ▱",
-                    fontSize = 13.sp,
-                    color = Color.Black
-                )
-            }
+            Text(
+                text = "Calendar",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
 
-            Row(
+            Spacer(modifier = Modifier.weight(1f))
+
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFE0A673))
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(44.dp)
+                    .background(Color.White, CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable { onBack() },
-                    tint = Color.Black
+                    imageVector = Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    tint = Color(0xFF666666),
+                    modifier = Modifier.size(22.dp)
                 )
+            }
+        }
 
-                Spacer(modifier = Modifier.padding(horizontal = 6.dp))
-
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .background(Color.White, RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp, vertical = 18.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Calendar",
-                    fontSize = 24.sp,
+                    text = currentMonth.year.toString(),
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
 
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH),
+                    fontSize = 20.sp,
+                    color = Color(0xFF4B5563)
+                )
+
                 Spacer(modifier = Modifier.weight(1f))
 
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CalendarMonth,
-                        contentDescription = null,
-                        tint = Color(0xFF666666),
-                        modifier = Modifier.size(24.dp)
-                    )
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowLeft,
+                    contentDescription = "Previous month",
+                    tint = Color(0xFF4B5563),
+                    modifier = Modifier.clickable {
+                        currentMonth = currentMonth.minusMonths(1)
+                    }
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowRight,
+                    contentDescription = "Next month",
+                    tint = Color(0xFF4B5563),
+                    modifier = Modifier.clickable {
+                        currentMonth = currentMonth.plusMonths(1)
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { day ->
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = day,
+                            fontSize = 13.sp,
+                            color = Color(0xFF667085)
+                        )
+                    }
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 20.dp)
-                    .background(Color.White, RoundedCornerShape(20.dp))
-                    .padding(horizontal = 18.dp, vertical = 22.dp)
-            ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = currentMonth.year.toString(),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
+            Spacer(modifier = Modifier.height(10.dp))
 
-                        Spacer(modifier = Modifier.padding(horizontal = 8.dp))
+            monthCells.chunked(7).forEach { week ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    week.forEach { date ->
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (date == null) {
+                                Box(modifier = Modifier.size(42.dp))
+                            } else {
+                                val hasTasks = taskDates.contains(date)
 
-                        Text(
-                            text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH),
-                            fontSize = 18.sp,
-                            color = Color(0xFF4B5563)
-                        )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.clickable(enabled = hasTasks) {
+                                        onDayClick(formatDateForTask(date))
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .background(
+                                                color = if (hasTasks) Color(0xFFEAF2FF) else Color.Transparent,
+                                                shape = RoundedCornerShape(12.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = date.dayOfMonth.toString(),
+                                            fontSize = 17.sp,
+                                            color = if (hasTasks) Color(0xFF2563EB) else Color(0xFF475467),
+                                            fontWeight = if (hasTasks) FontWeight.SemiBold else FontWeight.Normal
+                                        )
+                                    }
 
-                        Spacer(modifier = Modifier.weight(1f))
+                                    Spacer(modifier = Modifier.height(4.dp))
 
-                        Icon(
-                            imageVector = Icons.Outlined.KeyboardArrowLeft,
-                            contentDescription = "Previous month",
-                            tint = Color(0xFF4B5563),
-                            modifier = Modifier.clickable {
-                                currentMonth = currentMonth.minusMonths(1)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(5.dp)
+                                            .background(
+                                                color = if (hasTasks) Color(0xFF2563EB) else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
                             }
-                        )
-
-                        Spacer(modifier = Modifier.padding(horizontal = 6.dp))
-
-                        Icon(
-                            imageVector = Icons.Outlined.KeyboardArrowRight,
-                            contentDescription = "Next month",
-                            tint = Color(0xFF4B5563),
-                            modifier = Modifier.clickable {
-                                currentMonth = currentMonth.plusMonths(1)
-                            }
-                        )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.padding(vertical = 14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { day ->
+                    if (week.size < 7) {
+                        repeat(7 - week.size) {
                             Box(
                                 modifier = Modifier.weight(1f),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = day,
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF667085)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.padding(vertical = 8.dp))
-
-                    monthCells.chunked(7).forEach { week ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            week.forEach { date ->
-                                Box(
-                                    modifier = Modifier.weight(1f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (date == null) {
-                                        Box(modifier = Modifier.size(42.dp))
-                                    } else {
-                                        val hasTasks = taskDates.contains(date)
-                                        val isSelected = hasTasks && date.dayOfMonth == 14 && date.month == currentMonth.month && date.year == currentMonth.year
-
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.clickable(enabled = hasTasks) {
-                                                onDayClick(formatDateForTask(date))
-                                            }
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(38.dp)
-                                                    .background(
-                                                        color = if (isSelected) Color(0xFF3B82F6) else Color.Transparent,
-                                                        shape = RoundedCornerShape(12.dp)
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = date.dayOfMonth.toString(),
-                                                    fontSize = 18.sp,
-                                                    color = if (isSelected) Color.White else Color(0xFF475467)
-                                                )
-                                            }
-
-                                            Spacer(modifier = Modifier.padding(top = 3.dp))
-
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(5.dp)
-                                                    .background(
-                                                        color = if (hasTasks) Color(0xFF3B82F6) else Color.Transparent,
-                                                        shape = CircleShape
-                                                    )
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (week.size < 7) {
-                                repeat(7 - week.size) {
-                                    Box(
-                                        modifier = Modifier.weight(1f),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Box(modifier = Modifier.size(42.dp))
-                                    }
-                                }
+                                Box(modifier = Modifier.size(42.dp))
                             }
                         }
                     }
                 }
             }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BottomNavItem("Home", Icons.Outlined.Home, Color.Black)
-                BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, Color(0xFF9F98AA))
-                BottomNavItem("Notification", Icons.Outlined.Inventory2, Color(0xFF9F98AA))
-                BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color(0xFF9F98AA))
-            }
         }
+
+        AppBottomNavBar(
+            selectedItem = BottomNavDestination.HOME,
+            unreadNotificationCount = unreadNotificationCount,
+            onHomeClick = onHomeClick,
+            onMessagesClick = onMessagesClick,
+            onNotificationsClick = onNotificationsClick,
+            onProfileClick = onProfileClick
+        )
     }
 }
 
@@ -326,25 +295,5 @@ private fun firstDayOffset(dayOfWeek: DayOfWeek): Int {
         DayOfWeek.THURSDAY -> 4
         DayOfWeek.FRIDAY -> 5
         DayOfWeek.SATURDAY -> 6
-    }
-}
-
-@Composable
-private fun BottomNavItem(
-    label: String,
-    icon: ImageVector,
-    color: Color
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = color
-        )
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = color
-        )
     }
 }

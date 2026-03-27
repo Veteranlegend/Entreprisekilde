@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -28,16 +31,18 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SupervisorAccount
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,7 +67,9 @@ fun EmployeeScreen(
     users: List<EmployeeUser>,
     onBack: () -> Unit = {},
     onCreateUserClick: () -> Unit = {},
-    onUserClick: (EmployeeUser) -> Unit = {}
+    onUserClick: (EmployeeUser) -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     var searchText by remember { mutableStateOf("") }
 
@@ -75,84 +82,60 @@ fun EmployeeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE6DADA))
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .background(Color(0xFFF7F7F7))
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFE0A673))
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "Users",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.GridView,
+                    contentDescription = null,
+                    tint = Color(0xFF666666),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF7F7F7))
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "9:41 AM",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Text(
-                    text = "▮▮▮  ◠  ▱",
-                    fontSize = 13.sp,
-                    color = Color.Black
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFE0A673))
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.Black
-                        )
-                    }
-
-                    Text(
-                        text = "Users",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.GridView,
-                        contentDescription = null,
-                        tint = Color(0xFF666666),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            TextField(
+            OutlinedTextField(
                 value = searchText,
                 onValueChange = { searchText = it },
                 singleLine = true,
@@ -165,36 +148,31 @@ fun EmployeeScreen(
                 },
                 placeholder = {
                     Text(
-                        text = "Search",
+                        text = "Search users",
                         color = Color(0xFF8E8E93),
                         fontSize = 14.sp
                     )
                 },
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF0F0F0),
-                    unfocusedContainerColor = Color(0xFFF0F0F0),
-                    disabledContainerColor = Color(0xFFF0F0F0),
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
                     focusedTextColor = Color.Black,
                     unfocusedTextColor = Color.Black
                 ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 14.dp)
+                modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.padding(vertical = 8.dp))
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    top = 6.dp,
-                    bottom = 24.dp
-                )
+                contentPadding = PaddingValues(bottom = 20.dp)
             ) {
                 items(filteredUsers, key = { it.id }) { user ->
                     UserCard(
@@ -202,54 +180,59 @@ fun EmployeeScreen(
                         onClick = { onUserClick(user) }
                     )
                 }
-
-                item {
-                    Spacer(modifier = Modifier.padding(top = 18.dp))
-                }
-
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 44.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Color(0xFF7FA8D6),
-                                    RoundedCornerShape(18.dp)
-                                )
-                                .clickable { onCreateUserClick() }
-                                .padding(vertical = 18.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Create User",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
             }
 
-            Row(
+            Button(
+                onClick = onCreateUserClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 14.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF7FA8D6),
+                    contentColor = Color.Black
+                )
             ) {
-                BottomNavItem("Home", Icons.Outlined.Home, Color.Black)
-                BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, Color(0xFF9F98AA))
-                BottomNavItem("Notification", Icons.Outlined.Inventory2, Color(0xFF9F98AA))
-                BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color(0xFF9F98AA))
+                Text(
+                    text = "Create User",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomNavItem(
+                label = "Home",
+                icon = Icons.Outlined.Home,
+                color = Color.Black,
+                onClick = onHomeClick
+            )
+            BottomNavItem(
+                label = "Message",
+                icon = Icons.Outlined.ChatBubbleOutline,
+                color = Color(0xFF9F98AA)
+            )
+            BottomNavItem(
+                label = "Notification",
+                icon = Icons.Outlined.Inventory2,
+                color = Color(0xFF9F98AA)
+            )
+            BottomNavItem(
+                label = "Profile",
+                icon = Icons.Outlined.PersonOutline,
+                color = Color(0xFF9F98AA),
+                onClick = onProfileClick
+            )
         }
     }
 }
@@ -262,7 +245,7 @@ private fun UserCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF7F7F7), RoundedCornerShape(18.dp))
+            .background(Color.White, RoundedCornerShape(18.dp))
             .border(
                 width = 1.dp,
                 color = Color(0xFFD9D9D9),
@@ -286,7 +269,7 @@ private fun UserCard(
             )
         }
 
-        Spacer(modifier = Modifier.padding(horizontal = 10.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
         Text(
             text = user.fullName,
@@ -308,9 +291,13 @@ private fun UserCard(
 private fun BottomNavItem(
     label: String,
     icon: ImageVector,
-    color: Color
+    color: Color,
+    onClick: () -> Unit = {}
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = label,

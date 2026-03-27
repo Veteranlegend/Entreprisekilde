@@ -7,14 +7,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -23,8 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.PersonOutline
@@ -56,30 +58,32 @@ fun TasksScreen(
     onBack: () -> Unit = {},
     onCreateTaskClick: () -> Unit = {},
     onDeleteTask: (Int) -> Unit = {},
-    onTaskClick: (TaskData) -> Unit = {}
+    onTaskClick: (TaskData) -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
     val filteredTasks = tasks.filter {
         searchQuery.isBlank() ||
-                it.customer.contains(searchQuery, true) ||
-                it.address.contains(searchQuery, true) ||
-                it.assignTo.contains(searchQuery, true) ||
-                it.date.contains(searchQuery, true) ||
-                it.taskDetails.contains(searchQuery, true)
+                it.customer.contains(searchQuery, ignoreCase = true) ||
+                it.address.contains(searchQuery, ignoreCase = true) ||
+                it.assignTo.contains(searchQuery, ignoreCase = true) ||
+                it.date.contains(searchQuery, ignoreCase = true) ||
+                it.taskDetails.contains(searchQuery, ignoreCase = true)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE6DADA))
-            .statusBarsPadding()
+            .background(Color(0xFFF7F7F7))
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFFE0A673))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -91,11 +95,11 @@ fun TasksScreen(
                 tint = Color.Black
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Text(
                 text = "All Tasks",
-                fontSize = 24.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
@@ -104,71 +108,106 @@ fun TasksScreen(
 
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(44.dp)
                     .background(Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.GridView,
-                    contentDescription = null,
-                    tint = Color(0xFF666666)
+                    imageVector = Icons.Outlined.Assignment,
+                    contentDescription = "All Tasks",
+                    tint = Color(0xFF666666),
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
 
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search...") },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        )
-
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
-            itemsIndexed(filteredTasks) { _, task ->
-                TaskCard(
-                    task = task,
-                    onClick = { onTaskClick(task) },
-                    onDeleteClick = {
-                        val originalIndex = tasks.indexOf(task)
-                        if (originalIndex != -1) {
-                            onDeleteTask(originalIndex)
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search tasks...") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(filteredTasks) { _, task ->
+                    TaskCard(
+                        task = task,
+                        onClick = { onTaskClick(task) },
+                        onDeleteClick = {
+                            val originalIndex = tasks.indexOf(task)
+                            if (originalIndex != -1) {
+                                onDeleteTask(originalIndex)
+                            }
                         }
-                    }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Button(
+                onClick = onCreateTaskClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF79A7D8),
+                    contentColor = Color.Black
+                )
+            ) {
+                Text(
+                    text = "Create a Task",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
-        }
-
-        Button(
-            onClick = onCreateTaskClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .height(54.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF79A7D8))
-        ) {
-            Text("Create a Task", color = Color.Black)
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(Color.White)
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 10.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BottomNavItem("Home", Icons.Outlined.Home, Color.Black)
-            BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, Color(0xFF9F98AA))
-            BottomNavItem("Notification", Icons.Outlined.Inventory2, Color(0xFF9F98AA))
-            BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color(0xFF9F98AA))
+            BottomNavItem(
+                label = "Home",
+                icon = Icons.Outlined.Home,
+                color = Color.Black,
+                onClick = onHomeClick
+            )
+            BottomNavItem(
+                label = "Message",
+                icon = Icons.Outlined.ChatBubbleOutline,
+                color = Color(0xFF9F98AA)
+            )
+            BottomNavItem(
+                label = "Notification",
+                icon = Icons.Outlined.Inventory2,
+                color = Color(0xFF9F98AA)
+            )
+            BottomNavItem(
+                label = "Profile",
+                icon = Icons.Outlined.PersonOutline,
+                color = Color(0xFF9F98AA),
+                onClick = onProfileClick
+            )
         }
     }
 }
@@ -182,23 +221,25 @@ private fun TaskCard(
     var expanded by remember { mutableStateOf(false) }
 
     val statusColor = when (task.status) {
-        "Pending" -> Color.LightGray
+        "Pending" -> Color(0xFFE5E7EB)
         "In-progress" -> Color(0xFFF2E2A8)
         "Complete" -> Color(0xFFC7EBC4)
-        else -> Color.LightGray
+        else -> Color(0xFFE5E7EB)
     }
 
     Column(
         modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .background(Color.White, RoundedCornerShape(12.dp))
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(16.dp))
             .clickable { onClick() }
-            .padding(12.dp)
+            .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = task.customer,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = Color.Black
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -208,9 +249,13 @@ private fun TaskCard(
                     modifier = Modifier
                         .background(statusColor, RoundedCornerShape(50))
                         .clickable { expanded = true }
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text(task.status, fontSize = 12.sp)
+                    Text(
+                        text = task.status,
+                        fontSize = 12.sp,
+                        color = Color.Black
+                    )
                 }
 
                 DropdownMenu(
@@ -221,7 +266,6 @@ private fun TaskCard(
                         DropdownMenuItem(
                             text = { Text(value) },
                             onClick = {
-                                task.status = value
                                 expanded = false
                             }
                         )
@@ -230,36 +274,58 @@ private fun TaskCard(
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        Text(task.address)
+        Text(
+            text = task.address,
+            fontSize = 14.sp,
+            color = Color(0xFF444444)
+        )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFE9E9EB), RoundedCornerShape(8.dp))
-                .padding(10.dp),
+                .background(Color(0xFFE9E9EB), RoundedCornerShape(10.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Outlined.Schedule, null, modifier = Modifier.size(16.dp))
+            Icon(
+                imageVector = Icons.Outlined.Schedule,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+
             Spacer(modifier = Modifier.width(6.dp))
-            Text(task.date)
+
+            Text(
+                text = task.date,
+                fontSize = 13.sp
+            )
 
             Spacer(modifier = Modifier.width(10.dp))
 
             Divider(
                 modifier = Modifier
-                    .height(20.dp)
+                    .height(18.dp)
                     .width(1.dp)
             )
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            Icon(Icons.Outlined.AccountCircle, null, modifier = Modifier.size(16.dp))
+            Icon(
+                imageVector = Icons.Outlined.AccountCircle,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+
             Spacer(modifier = Modifier.width(6.dp))
-            Text(task.assignTo)
+
+            Text(
+                text = task.assignTo,
+                fontSize = 13.sp
+            )
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -269,7 +335,7 @@ private fun TaskCard(
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -278,13 +344,13 @@ private fun TaskCard(
             Button(
                 onClick = onDeleteClick,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE58C8C)
+                    containerColor = Color(0xFFE58C8C),
+                    contentColor = Color.Black
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = "Delete",
-                    color = Color.Black,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -296,9 +362,13 @@ private fun TaskCard(
 private fun BottomNavItem(
     label: String,
     icon: ImageVector,
-    color: Color
+    color: Color,
+    onClick: () -> Unit = {}
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = label,

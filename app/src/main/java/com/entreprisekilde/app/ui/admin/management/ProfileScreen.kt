@@ -15,23 +15,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -42,14 +39,16 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.entreprisekilde.app.ui.components.AppBottomNavBar
+import com.entreprisekilde.app.ui.components.BottomNavDestination
 
 @Composable
 fun ProfileScreen(
@@ -59,7 +58,11 @@ fun ProfileScreen(
     phoneNumber: String,
     profileImageUri: String? = null,
     onProfileImageChange: (String?) -> Unit = {},
-    onLogoutClick: () -> Unit = {}
+    onLogoutClick: () -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -70,25 +73,34 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE6DADA))
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFF5EEE8),
+                        Color(0xFFF9F7F4),
+                        Color(0xFFFFFFFF)
+                    )
+                )
+            )
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF7F7F7))
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFFFDFDFD))
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFE0A673))
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .background(Color(0xFFD9A06B))
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Profile",
-                    fontSize = 24.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
@@ -97,15 +109,15 @@ fun ProfileScreen(
 
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(46.dp)
                         .background(Color.White, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.GridView,
-                        contentDescription = null,
+                        imageVector = Icons.Outlined.Person,
+                        contentDescription = "Profile",
                         tint = Color(0xFF666666),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -114,7 +126,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 22.dp)
+                    .padding(horizontal = 20.dp, vertical = 24.dp)
             ) {
                 ProfileImageSection(
                     profileImageUri = profileImageUri,
@@ -123,59 +135,55 @@ fun ProfileScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.size(28.dp))
 
                 Text(
                     text = "General",
-                    fontSize = 18.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 18.dp)
                 )
-
-                ProfileField(
-                    label = "Email address",
-                    value = email
-                )
-
-                Spacer(modifier = Modifier.size(14.dp))
 
                 ProfileField(
                     label = "First name",
                     value = firstName
                 )
 
-                Spacer(modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.size(10.dp))
 
                 ProfileField(
                     label = "Last name",
                     value = lastName
                 )
 
-                Spacer(modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.size(10.dp))
+
+                ProfileField(
+                    label = "Email address",
+                    value = email
+                )
+
+                Spacer(modifier = Modifier.size(10.dp))
 
                 ProfilePhoneField(
                     label = "Phone number",
                     value = phoneNumber
                 )
 
-                Spacer(modifier = Modifier.size(34.dp))
+                Spacer(modifier = Modifier.size(28.dp))
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                Color(0xFF0F57A8),
-                                RoundedCornerShape(10.dp)
-                            )
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF0F57A8))
                             .clickable { onLogoutClick() }
-                            .padding(vertical = 18.dp),
+                            .padding(vertical = 16.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -188,22 +196,16 @@ fun ProfileScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.size(16.dp))
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BottomNavItem("Home", Icons.Outlined.Home, Color.Black)
-                BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, Color(0xFF9F98AA))
-                BottomNavItem("Notification", Icons.Outlined.Inventory2, Color(0xFF9F98AA))
-                BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color(0xFF9F98AA))
-            }
+            AppBottomNavBar(
+                selectedItem = BottomNavDestination.PROFILE,
+                onHomeClick = onHomeClick,
+                onMessagesClick = onMessagesClick,
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick
+            )
         }
     }
 }
@@ -266,9 +268,9 @@ private fun ProfileImageCircle(
 
     Box(
         modifier = Modifier
-            .size(96.dp)
+            .size(110.dp)
             .clip(CircleShape)
-            .background(Color(0xFFDDE2E6))
+            .background(Color(0xFFE2E6EA))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -282,10 +284,10 @@ private fun ProfileImageCircle(
         } else {
             Text(
                 text = "Add\nPhoto",
-                fontSize = 14.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color(0xFF6E7785),
-                lineHeight = 18.sp
+                lineHeight = 20.sp
             )
         }
     }
@@ -303,9 +305,9 @@ private fun ProfileField(
         singleLine = true,
         shape = RoundedCornerShape(14.dp),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
+            focusedContainerColor = Color(0xFFF7F7F8),
+            unfocusedContainerColor = Color(0xFFF7F7F8),
+            disabledContainerColor = Color(0xFFF7F7F8),
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent,
@@ -353,9 +355,9 @@ private fun ProfilePhoneField(
         },
         shape = RoundedCornerShape(14.dp),
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
+            focusedContainerColor = Color(0xFFF7F7F8),
+            unfocusedContainerColor = Color(0xFFF7F7F8),
+            disabledContainerColor = Color(0xFFF7F7F8),
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent,
@@ -373,24 +375,4 @@ private fun ProfilePhoneField(
         },
         modifier = Modifier.fillMaxWidth()
     )
-}
-
-@Composable
-private fun BottomNavItem(
-    label: String,
-    icon: ImageVector,
-    color: Color
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = color
-        )
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = color
-        )
-    }
 }
