@@ -7,27 +7,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,26 +45,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.random.Random
 
 @Composable
 fun CreateUserScreen(
     onBack: () -> Unit = {},
-    onAddUserClick: () -> Unit = {},
+    onCreateUser: (EmployeeUser) -> Unit = {},
     onHomeClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
-    var email by remember { mutableStateOf("tomas.larsen@entreprisekilde.dk") }
-    var firstName by remember { mutableStateOf("Tomas") }
-    var lastName by remember { mutableStateOf("Larsen") }
-    var phoneNumber by remember { mutableStateOf("1234123456") }
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
@@ -119,33 +127,89 @@ fun CreateUserScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             FancyInputField(
-                label = "Email address",
-                value = email,
-                onValueChange = { email = it }
-            )
-
-            FancyInputField(
-                label = "First name",
+                label = "First Name",
                 value = firstName,
                 onValueChange = { firstName = it }
             )
 
             FancyInputField(
-                label = "Last name",
+                label = "Last Name",
                 value = lastName,
                 onValueChange = { lastName = it }
             )
 
-            FancyPhoneField(
-                label = "Phone number",
+            FancyInputField(
+                label = "Phone Number",
                 value = phoneNumber,
                 onValueChange = { phoneNumber = it }
             )
 
+            FancyInputField(
+                label = "Email",
+                value = email,
+                onValueChange = { email = it }
+            )
+
+            FancyInputField(
+                label = "Username",
+                value = username,
+                onValueChange = { username = it }
+            )
+
+            FancyPasswordField(
+                label = "Password",
+                value = password,
+                onValueChange = { password = it },
+                passwordVisible = passwordVisible,
+                onToggleVisibility = { passwordVisible = !passwordVisible }
+            )
+
+            if (errorMessage.isNotBlank()) {
+                Text(
+                    text = errorMessage,
+                    color = Color(0xFFD32F2F),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
             Button(
-                onClick = onAddUserClick,
+                onClick = {
+                    val cleanFirstName = firstName.trim()
+                    val cleanLastName = lastName.trim()
+                    val cleanPhoneNumber = phoneNumber.trim()
+                    val cleanEmail = email.trim()
+                    val cleanUsername = username.trim()
+                    val cleanPassword = password.trim()
+
+                    if (
+                        cleanFirstName.isBlank() ||
+                        cleanLastName.isBlank() ||
+                        cleanPhoneNumber.isBlank() ||
+                        cleanEmail.isBlank() ||
+                        cleanUsername.isBlank() ||
+                        cleanPassword.isBlank()
+                    ) {
+                        errorMessage = "Please fill in all fields."
+                    } else {
+                        errorMessage = ""
+
+                        val newUser = EmployeeUser(
+                            id = Random.nextInt(1000, 999999),
+                            firstName = cleanFirstName,
+                            lastName = cleanLastName,
+                            email = cleanEmail,
+                            phoneNumber = cleanPhoneNumber,
+                            username = cleanUsername,
+                            password = cleanPassword,
+                            role = "employee"
+                        )
+
+                        onCreateUser(newUser)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -156,7 +220,7 @@ fun CreateUserScreen(
                 )
             ) {
                 Text(
-                    text = "Add User",
+                    text = "Create User",
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -181,12 +245,14 @@ fun CreateUserScreen(
             BottomNavItem(
                 label = "Message",
                 icon = Icons.Outlined.ChatBubbleOutline,
-                color = Color(0xFF9F98AA)
+                color = Color(0xFF9F98AA),
+                onClick = onMessagesClick
             )
             BottomNavItem(
                 label = "Notification",
                 icon = Icons.Outlined.Inventory2,
-                color = Color(0xFF9F98AA)
+                color = Color(0xFF9F98AA),
+                onClick = onNotificationsClick
             )
             BottomNavItem(
                 label = "Profile",
@@ -222,7 +288,7 @@ private fun FancyInputField(
         label = {
             Text(
                 text = label,
-                color = Color(0xFF8F99A7)
+                color = Color(0xFF4F4F4F)
             )
         },
         modifier = Modifier.fillMaxWidth()
@@ -230,29 +296,33 @@ private fun FancyInputField(
 }
 
 @Composable
-private fun FancyPhoneField(
+private fun FancyPasswordField(
     label: String,
     value: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    passwordVisible: Boolean,
+    onToggleVisibility: () -> Unit
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
         shape = RoundedCornerShape(14.dp),
-        leadingIcon = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        visualTransformation = if (passwordVisible) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
+        trailingIcon = {
+            IconButton(onClick = onToggleVisibility) {
                 Icon(
-                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = Color(0xFF8F99A7)
-                )
-                Text(
-                    text = "|",
-                    color = Color(0xFF8F99A7),
-                    fontSize = 22.sp
+                    imageVector = if (passwordVisible) {
+                        Icons.Default.Visibility
+                    } else {
+                        Icons.Default.VisibilityOff
+                    },
+                    contentDescription = "Toggle password visibility",
+                    tint = Color(0xFF666666)
                 )
             }
         },
@@ -269,7 +339,7 @@ private fun FancyPhoneField(
         label = {
             Text(
                 text = label,
-                color = Color(0xFF8F99A7)
+                color = Color(0xFF4F4F4F)
             )
         },
         modifier = Modifier.fillMaxWidth()

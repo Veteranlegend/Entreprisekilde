@@ -9,23 +9,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.PersonOutline
@@ -51,16 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-data class EmployeeUser(
-    val id: Int,
-    val firstName: String,
-    val lastName: String,
-    val email: String,
-    val phoneNumber: String
-) {
-    val fullName: String
-        get() = "$firstName $lastName"
-}
 
 @Composable
 fun EmployeeScreen(
@@ -69,6 +57,8 @@ fun EmployeeScreen(
     onCreateUserClick: () -> Unit = {},
     onUserClick: (EmployeeUser) -> Unit = {},
     onHomeClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
     var searchText by remember { mutableStateOf("") }
@@ -76,14 +66,15 @@ fun EmployeeScreen(
     val filteredUsers = users.filter {
         it.fullName.contains(searchText, ignoreCase = true) ||
                 it.email.contains(searchText, ignoreCase = true) ||
-                it.phoneNumber.contains(searchText, ignoreCase = true)
+                it.phoneNumber.contains(searchText, ignoreCase = true) ||
+                it.username.contains(searchText, ignoreCase = true)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
@@ -121,8 +112,8 @@ fun EmployeeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.GridView,
-                    contentDescription = null,
+                    imageVector = Icons.Outlined.Badge,
+                    contentDescription = "Users",
                     tint = Color(0xFF666666),
                     modifier = Modifier.size(22.dp)
                 )
@@ -220,12 +211,14 @@ fun EmployeeScreen(
             BottomNavItem(
                 label = "Message",
                 icon = Icons.Outlined.ChatBubbleOutline,
-                color = Color(0xFF9F98AA)
+                color = Color(0xFF9F98AA),
+                onClick = onMessagesClick
             )
             BottomNavItem(
                 label = "Notification",
                 icon = Icons.Outlined.Inventory2,
-                color = Color(0xFF9F98AA)
+                color = Color(0xFF9F98AA),
+                onClick = onNotificationsClick
             )
             BottomNavItem(
                 label = "Profile",

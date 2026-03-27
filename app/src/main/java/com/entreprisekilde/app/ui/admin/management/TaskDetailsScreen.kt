@@ -7,14 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,7 +47,7 @@ fun TaskDetailsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
@@ -76,7 +74,7 @@ fun TaskDetailsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = task.assignTo.take(1).uppercase(),
+                    text = task.customer.take(1).uppercase(),
                     color = Color.Black,
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp
@@ -86,7 +84,7 @@ fun TaskDetailsScreen(
             Spacer(modifier = Modifier.size(14.dp))
 
             Text(
-                text = task.assignTo,
+                text = task.customer,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
@@ -130,21 +128,22 @@ fun TaskDetailsScreen(
                     DetailItem("Address", task.address)
                     DetailItem("Date", formatLongDate(task.date))
                     DetailItem("Task Details", task.taskDetails)
-                    DetailItem("From", task.assignTo)
-                    DetailItem("To", task.assignTo)
+                    DetailItem("Assigned to", task.assignTo)
                     DetailItem("Status", task.status)
                 }
             }
         }
 
-        AppBottomNavBar(
-            selectedItem = BottomNavDestination.HOME,
-            unreadNotificationCount = unreadNotificationCount,
-            onHomeClick = onHomeClick,
-            onMessagesClick = onMessagesClick,
-            onNotificationsClick = onNotificationsClick,
-            onProfileClick = onProfileClick
-        )
+        Box(modifier = Modifier.navigationBarsPadding()) {
+            AppBottomNavBar(
+                selectedItem = BottomNavDestination.HOME,
+                unreadNotificationCount = unreadNotificationCount,
+                onHomeClick = onHomeClick,
+                onMessagesClick = onMessagesClick,
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick
+            )
+        }
     }
 }
 

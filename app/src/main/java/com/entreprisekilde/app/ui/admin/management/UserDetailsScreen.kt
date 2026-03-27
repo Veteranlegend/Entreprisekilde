@@ -7,22 +7,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Home
@@ -46,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -55,28 +57,36 @@ fun UserDetailsScreen(
     onBack: () -> Unit = {},
     onSaveUser: (EmployeeUser) -> Unit = {},
     onHomeClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
     var isEditing by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     var email by remember { mutableStateOf(user.email) }
     var firstName by remember { mutableStateOf(user.firstName) }
     var lastName by remember { mutableStateOf(user.lastName) }
     var phoneNumber by remember { mutableStateOf(user.phoneNumber) }
+    var username by remember { mutableStateOf(user.username) }
+    var password by remember { mutableStateOf(user.password) }
 
     LaunchedEffect(user) {
         email = user.email
         firstName = user.firstName
         lastName = user.lastName
         phoneNumber = user.phoneNumber
+        username = user.username
+        password = user.password
         isEditing = false
+        passwordVisible = false
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
@@ -130,13 +140,6 @@ fun UserDetailsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             UserField(
-                label = "Email address",
-                value = email,
-                onValueChange = { email = it },
-                readOnly = !isEditing
-            )
-
-            UserField(
                 label = "First name",
                 value = firstName,
                 onValueChange = { firstName = it },
@@ -157,16 +160,41 @@ fun UserDetailsScreen(
                 readOnly = !isEditing
             )
 
+            UserField(
+                label = "Email address",
+                value = email,
+                onValueChange = { email = it },
+                readOnly = !isEditing
+            )
+
+            UserField(
+                label = "Username",
+                value = username,
+                onValueChange = { username = it },
+                readOnly = !isEditing
+            )
+
+            PasswordUserField(
+                label = "Password",
+                value = password,
+                onValueChange = { password = it },
+                readOnly = !isEditing,
+                passwordVisible = passwordVisible,
+                onToggleVisibility = { passwordVisible = !passwordVisible }
+            )
+
             Spacer(modifier = Modifier.height(10.dp))
 
             Button(
                 onClick = {
                     if (isEditing) {
                         val updatedUser = user.copy(
-                            email = email.trim(),
                             firstName = firstName.trim(),
                             lastName = lastName.trim(),
-                            phoneNumber = phoneNumber.trim()
+                            phoneNumber = phoneNumber.trim(),
+                            email = email.trim(),
+                            username = username.trim(),
+                            password = password.trim()
                         )
                         onSaveUser(updatedUser)
                         isEditing = false
@@ -209,12 +237,14 @@ fun UserDetailsScreen(
             BottomNavItem(
                 label = "Message",
                 icon = Icons.Outlined.ChatBubbleOutline,
-                color = Color(0xFF9F98AA)
+                color = Color(0xFF9F98AA),
+                onClick = onMessagesClick
             )
             BottomNavItem(
                 label = "Notification",
                 icon = Icons.Outlined.Inventory2,
-                color = Color(0xFF9F98AA)
+                color = Color(0xFF9F98AA),
+                onClick = onNotificationsClick
             )
             BottomNavItem(
                 label = "Profile",
@@ -238,6 +268,62 @@ private fun UserField(
         onValueChange = onValueChange,
         readOnly = readOnly,
         singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            disabledContainerColor = Color.White,
+            focusedIndicatorColor = Color(0xFFD0D5DD),
+            unfocusedIndicatorColor = Color(0xFFD0D5DD),
+            disabledIndicatorColor = Color(0xFFD0D5DD),
+            focusedTextColor = Color.Black,
+            unfocusedTextColor = Color.Black,
+            disabledTextColor = Color.Black,
+            focusedLabelColor = Color(0xFF8F99A7),
+            unfocusedLabelColor = Color(0xFF8F99A7)
+        ),
+        label = {
+            Text(
+                text = label,
+                color = Color(0xFF8F99A7)
+            )
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun PasswordUserField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    readOnly: Boolean,
+    passwordVisible: Boolean,
+    onToggleVisibility: () -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        readOnly = readOnly,
+        singleLine = true,
+        visualTransformation = if (passwordVisible) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
+        trailingIcon = {
+            IconButton(onClick = onToggleVisibility) {
+                Icon(
+                    imageVector = if (passwordVisible) {
+                        Icons.Default.Visibility
+                    } else {
+                        Icons.Default.VisibilityOff
+                    },
+                    contentDescription = "Toggle password visibility",
+                    tint = Color(0xFF666666)
+                )
+            }
+        },
         shape = RoundedCornerShape(14.dp),
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.White,

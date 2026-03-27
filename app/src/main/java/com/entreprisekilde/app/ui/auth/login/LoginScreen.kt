@@ -1,5 +1,5 @@
 package com.entreprisekilde.app.ui.auth.login
-import androidx.compose.foundation.layout.fillMaxWidth
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -17,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,7 +47,8 @@ import com.entreprisekilde.app.R
 
 @Composable
 fun LoginScreen(
-    onLoginClick: () -> Unit = {}
+    onLoginClick: (String, String) -> Unit = { _, _ -> },
+    errorMessage: String? = null
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -134,10 +137,23 @@ fun LoginScreen(
                 onTogglePasswordVisibility = { passwordVisible = !passwordVisible }
             )
 
+            if (!errorMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = errorMessage,
+                    color = Color(0xFFFFD6D6),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.width(290.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(34.dp))
 
             Button(
-                onClick = onLoginClick,
+                onClick = {
+                    onLoginClick(username.trim(), password.trim())
+                },
                 modifier = Modifier
                     .width(290.dp)
                     .height(54.dp),
@@ -228,7 +244,11 @@ private fun LoginInputField(
                             onClick = onTogglePasswordVisibility
                         ) {
                             Icon(
-                                imageVector = Icons.Default.VisibilityOff,
+                                imageVector = if (passwordVisible) {
+                                    Icons.Default.Visibility
+                                } else {
+                                    Icons.Default.VisibilityOff
+                                },
                                 contentDescription = "Toggle password visibility",
                                 tint = Color(0xFF9E9E9E)
                             )

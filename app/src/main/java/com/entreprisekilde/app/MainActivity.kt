@@ -49,26 +49,82 @@ class MainActivity : ComponentActivity() {
                 val selectedUser = remember { mutableStateOf<EmployeeUser?>(null) }
                 val profileImageUri = remember { mutableStateOf<String?>(null) }
                 val selectedThread = remember { mutableStateOf<MessageThread?>(null) }
+                val loginErrorMessage = remember { mutableStateOf<String?>(null) }
+                val loggedInUser = remember { mutableStateOf<EmployeeUser?>(null) }
 
                 val users = remember {
                     mutableStateListOf(
-                        EmployeeUser(1, "Rasmus", "Jensen", "rasmus.jensen@entreprisekilde.dk", "12341234"),
-                        EmployeeUser(2, "Tomas", "Larsen", "tomas.larsen@entreprisekilde.dk", "22334455"),
-                        EmployeeUser(3, "Peter", "Hansen", "peter.hansen@entreprisekilde.dk", "33445566"),
-                        EmployeeUser(4, "John", "Miller", "john.miller@entreprisekilde.dk", "44556677"),
-                        EmployeeUser(5, "Ahmad", "El Haj", "ahmad.elhaj@entreprisekilde.dk", "55667788"),
-                        EmployeeUser(6, "Lars", "Nielsen", "lars.nielsen@entreprisekilde.dk", "66778899")
+                        EmployeeUser(
+                            id = 1,
+                            firstName = "Rasmus",
+                            lastName = "Jensen",
+                            email = "rasmus.jensen@entreprisekilde.dk",
+                            phoneNumber = "12341234",
+                            username = "rasmus",
+                            password = "1234",
+                            role = "employee"
+                        ),
+                        EmployeeUser(
+                            id = 2,
+                            firstName = "Tomas",
+                            lastName = "Larsen",
+                            email = "tomas.larsen@entreprisekilde.dk",
+                            phoneNumber = "22334455",
+                            username = "tomas",
+                            password = "1234",
+                            role = "admin"
+                        ),
+                        EmployeeUser(
+                            id = 3,
+                            firstName = "Peter",
+                            lastName = "Hansen",
+                            email = "peter.hansen@entreprisekilde.dk",
+                            phoneNumber = "33445566",
+                            username = "peter",
+                            password = "1234",
+                            role = "employee"
+                        ),
+                        EmployeeUser(
+                            id = 4,
+                            firstName = "John",
+                            lastName = "Miller",
+                            email = "john.miller@entreprisekilde.dk",
+                            phoneNumber = "44556677",
+                            username = "john",
+                            password = "1234",
+                            role = "employee"
+                        ),
+                        EmployeeUser(
+                            id = 5,
+                            firstName = "Ahmad",
+                            lastName = "El Haj",
+                            email = "ahmad.elhaj@entreprisekilde.dk",
+                            phoneNumber = "55667788",
+                            username = "ahmad",
+                            password = "1234",
+                            role = "employee"
+                        ),
+                        EmployeeUser(
+                            id = 6,
+                            firstName = "Lars",
+                            lastName = "Nielsen",
+                            email = "lars.nielsen@entreprisekilde.dk",
+                            phoneNumber = "66778899",
+                            username = "lars",
+                            password = "1234",
+                            role = "employee"
+                        )
                     )
                 }
 
                 val tasks = remember {
                     mutableStateListOf(
-                        TaskData("Painting the Wall", "12345678", "Roskilde", "08/03/2026", "John", "Paint wall", "Pending"),
-                        TaskData("Installation", "87654321", "Copenhagen", "26/03/2026", "Peter", "Install equipment", "In-progress"),
-                        TaskData("Bathroom Renovation", "11112222", "Lyngby", "14/02/2026", "John", "Renovate bathroom", "Complete"),
-                        TaskData("Fix Sink Leak", "11223344", "Office", "14/03/2026", "John", "Fix kitchen sink leak", "In-progress"),
-                        TaskData("Fix Sink Leak", "55667788", "Office", "14/03/2026", "Peter", "Replace damaged pipe", "In-progress"),
-                        TaskData("Fix Sink Leak", "99887766", "Office", "14/03/2026", "John", "Final inspection", "Complete")
+                        TaskData("Painting the Wall", "12345678", "Roskilde", "08/03/2026", "John Miller", "Paint wall", "Pending"),
+                        TaskData("Installation", "87654321", "Copenhagen", "26/03/2026", "Peter Hansen", "Install equipment", "In-progress"),
+                        TaskData("Bathroom Renovation", "11112222", "Lyngby", "14/02/2026", "John Miller", "Renovate bathroom", "Complete"),
+                        TaskData("Fix Sink Leak", "11223344", "Office", "14/03/2026", "John Miller", "Fix kitchen sink leak", "In-progress"),
+                        TaskData("Fix Sink Leak", "55667788", "Office", "14/03/2026", "Peter Hansen", "Replace damaged pipe", "In-progress"),
+                        TaskData("Fix Sink Leak", "99887766", "Office", "14/03/2026", "John Miller", "Final inspection", "Complete")
                     )
                 }
 
@@ -123,8 +179,19 @@ class MainActivity : ComponentActivity() {
                 when (currentScreen.value) {
 
                     "login" -> LoginScreen(
-                        onLoginClick = {
-                            currentScreen.value = "dashboard"
+                        errorMessage = loginErrorMessage.value,
+                        onLoginClick = { username, password ->
+                            val matchedUser = users.find {
+                                it.username == username && it.password == password
+                            }
+
+                            if (matchedUser != null) {
+                                loggedInUser.value = matchedUser
+                                loginErrorMessage.value = null
+                                currentScreen.value = "dashboard"
+                            } else {
+                                loginErrorMessage.value = "Invalid username or password"
+                            }
                         }
                     )
 
@@ -161,6 +228,7 @@ class MainActivity : ComponentActivity() {
                                 selectedThread.value = null
                             }
                         },
+                        onBack = { currentScreen.value = "dashboard" },
                         onHomeClick = { currentScreen.value = "dashboard" },
                         onNotificationsClick = { currentScreen.value = "notifications" },
                         onProfileClick = { currentScreen.value = "profile" }
@@ -210,44 +278,56 @@ class MainActivity : ComponentActivity() {
                         onProfileClick = { currentScreen.value = "profile" }
                     )
 
-                    "profile" -> ProfileScreen(
-                        email = "tomas.larsen@entreprisekilde.dk",
-                        firstName = "Tomas",
-                        lastName = "Larsen",
-                        phoneNumber = "1234123456",
-                        profileImageUri = profileImageUri.value,
-                        onProfileImageChange = { newUri ->
-                            profileImageUri.value = newUri
-                        },
-                        onLogoutClick = {
-                            currentScreen.value = "login"
-                        },
-                        onHomeClick = {
-                            currentScreen.value = "dashboard"
-                        },
-                        onMessagesClick = {
-                            currentScreen.value = "messages"
-                        },
-                        onNotificationsClick = {
-                            currentScreen.value = "notifications"
-                        },
-                        onProfileClick = {
-                            currentScreen.value = "profile"
-                        }
-                    )
+                    "profile" -> {
+                        val currentLoggedUser = loggedInUser.value
+                        ProfileScreen(
+                            email = currentLoggedUser?.email ?: "tomas.larsen@entreprisekilde.dk",
+                            firstName = currentLoggedUser?.firstName ?: "Tomas",
+                            lastName = currentLoggedUser?.lastName ?: "Larsen",
+                            phoneNumber = currentLoggedUser?.phoneNumber ?: "1234123456",
+                            profileImageUri = profileImageUri.value,
+                            onProfileImageChange = { newUri ->
+                                profileImageUri.value = newUri
+                            },
+                            onLogoutClick = {
+                                loggedInUser.value = null
+                                loginErrorMessage.value = null
+                                currentScreen.value = "login"
+                            },
+                            onHomeClick = {
+                                currentScreen.value = "dashboard"
+                            },
+                            onMessagesClick = {
+                                currentScreen.value = "messages"
+                            },
+                            onNotificationsClick = {
+                                currentScreen.value = "notifications"
+                            },
+                            onProfileClick = {
+                                currentScreen.value = "profile"
+                            }
+                        )
+                    }
 
                     "tasks" -> TasksScreen(
                         tasks = tasks,
                         onBack = { currentScreen.value = "dashboard" },
                         onCreateTaskClick = { currentScreen.value = "createTask" },
                         onDeleteTask = { index ->
-                            if (index in tasks.indices) tasks.removeAt(index)
+                            if (index in tasks.indices) {
+                                tasks.removeAt(index)
+                            }
                         },
                         onTaskClick = { clickedTask ->
                             selectedTaskIndex.value = tasks.indexOf(clickedTask)
                             if (selectedTaskIndex.value != -1) {
                                 taskDetailsBackTarget.value = "tasks"
                                 currentScreen.value = "taskDetails"
+                            }
+                        },
+                        onStatusChange = { index, newStatus ->
+                            if (index in tasks.indices) {
+                                tasks[index] = tasks[index].copy(status = newStatus)
                             }
                         },
                         onHomeClick = { currentScreen.value = "dashboard" },
@@ -280,13 +360,20 @@ class MainActivity : ComponentActivity() {
                             currentScreen.value = "userDetails"
                         },
                         onHomeClick = { currentScreen.value = "dashboard" },
+                        onMessagesClick = { currentScreen.value = "messages" },
+                        onNotificationsClick = { currentScreen.value = "notifications" },
                         onProfileClick = { currentScreen.value = "profile" }
                     )
 
                     "createUser" -> CreateUserScreen(
                         onBack = { currentScreen.value = "employees" },
-                        onAddUserClick = { currentScreen.value = "employees" },
+                        onCreateUser = { newUser ->
+                            users.add(newUser)
+                            currentScreen.value = "employees"
+                        },
                         onHomeClick = { currentScreen.value = "dashboard" },
+                        onMessagesClick = { currentScreen.value = "messages" },
+                        onNotificationsClick = { currentScreen.value = "notifications" },
                         onProfileClick = { currentScreen.value = "profile" }
                     )
 
@@ -304,6 +391,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onHomeClick = { currentScreen.value = "dashboard" },
+                                onMessagesClick = { currentScreen.value = "messages" },
+                                onNotificationsClick = { currentScreen.value = "notifications" },
                                 onProfileClick = { currentScreen.value = "profile" }
                             )
                         }

@@ -59,6 +59,7 @@ fun TasksScreen(
     onCreateTaskClick: () -> Unit = {},
     onDeleteTask: (Int) -> Unit = {},
     onTaskClick: (TaskData) -> Unit = {},
+    onStatusChange: (Int, String) -> Unit = { _, _ -> },
     onHomeClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
@@ -143,13 +144,19 @@ fun TasksScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 itemsIndexed(filteredTasks) { _, task ->
+                    val originalIndex = tasks.indexOf(task)
+
                     TaskCard(
                         task = task,
                         onClick = { onTaskClick(task) },
                         onDeleteClick = {
-                            val originalIndex = tasks.indexOf(task)
                             if (originalIndex != -1) {
                                 onDeleteTask(originalIndex)
+                            }
+                        },
+                        onStatusChange = { newStatus ->
+                            if (originalIndex != -1) {
+                                onStatusChange(originalIndex, newStatus)
                             }
                         }
                     )
@@ -216,7 +223,8 @@ fun TasksScreen(
 private fun TaskCard(
     task: TaskData,
     onClick: () -> Unit = {},
-    onDeleteClick: () -> Unit = {}
+    onDeleteClick: () -> Unit = {},
+    onStatusChange: (String) -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -266,6 +274,7 @@ private fun TaskCard(
                         DropdownMenuItem(
                             text = { Text(value) },
                             onClick = {
+                                onStatusChange(value)
                                 expanded = false
                             }
                         )
