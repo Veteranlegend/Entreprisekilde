@@ -41,8 +41,8 @@ fun AppBottomNavBar(
             .fillMaxWidth()
             .background(Color.White)
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         BottomNavItem(
@@ -92,13 +92,16 @@ private fun BottomNavItem(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+        modifier = Modifier
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clickable { onClick() }
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = color
         )
+
         Text(
             text = label,
             fontSize = 11.sp,
@@ -117,7 +120,9 @@ private fun NotificationBottomNavItem(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+        modifier = Modifier
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clickable { onClick() }
     ) {
         Box {
             Icon(

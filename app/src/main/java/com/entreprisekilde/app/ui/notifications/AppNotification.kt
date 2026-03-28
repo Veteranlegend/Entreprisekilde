@@ -6,7 +6,8 @@ data class AppNotification(
     val message: String,
     val type: NotificationType,
     val createdAt: String,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val relatedThreadId: Int? = null
 )
 
 enum class NotificationType {

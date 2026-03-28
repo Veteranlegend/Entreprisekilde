@@ -1,0 +1,111 @@
+package com.entreprisekilde.app.data.repository
+
+import androidx.compose.runtime.mutableStateListOf
+import com.entreprisekilde.app.ui.admin.users.EmployeeUser
+
+class UserRepository {
+
+    private var nextId = 7
+
+    private val users = mutableStateListOf(
+        EmployeeUser(
+            id = 1,
+            firstName = "Rasmus",
+            lastName = "Jensen",
+            email = "rasmus.jensen@entreprisekilde.dk",
+            phoneNumber = "12341234",
+            username = "rasmus",
+            password = "1234",
+            role = "employee"
+        ),
+        EmployeeUser(
+            id = 2,
+            firstName = "Tomas",
+            lastName = "Larsen",
+            email = "tomas.larsen@entreprisekilde.dk",
+            phoneNumber = "22334455",
+            username = "tomas",
+            password = "1234",
+            role = "admin"
+        ),
+        EmployeeUser(
+            id = 3,
+            firstName = "Peter",
+            lastName = "Hansen",
+            email = "peter.hansen@entreprisekilde.dk",
+            phoneNumber = "33445566",
+            username = "peter",
+            password = "1234",
+            role = "employee"
+        ),
+        EmployeeUser(
+            id = 4,
+            firstName = "John",
+            lastName = "Miller",
+            email = "john.miller@entreprisekilde.dk",
+            phoneNumber = "44556677",
+            username = "john",
+            password = "1234",
+            role = "employee"
+        ),
+        EmployeeUser(
+            id = 5,
+            firstName = "Ahmad",
+            lastName = "El Haj",
+            email = "ahmad.elhaj@entreprisekilde.dk",
+            phoneNumber = "55667788",
+            username = "ahmad",
+            password = "1234",
+            role = "employee"
+        ),
+        EmployeeUser(
+            id = 6,
+            firstName = "Lars",
+            lastName = "Nielsen",
+            email = "lars.nielsen@entreprisekilde.dk",
+            phoneNumber = "66778899",
+            username = "lars",
+            password = "1234",
+            role = "employee"
+        )
+    )
+
+    fun getUsers(): List<EmployeeUser> {
+        return users
+    }
+
+    fun login(username: String, password: String): EmployeeUser? {
+        return users.find {
+            it.username == username && it.password == password
+        }
+    }
+
+    fun addUser(
+        firstName: String,
+        lastName: String,
+        email: String,
+        phoneNumber: String,
+        username: String,
+        password: String
+    ) {
+        val newUser = EmployeeUser(
+            id = nextId++,
+            firstName = firstName,
+            lastName = lastName,
+            email = email,
+            phoneNumber = phoneNumber,
+            username = username,
+            password = password,
+            role = "employee"
+        )
+
+        users.add(newUser)
+    }
+
+    fun updateUser(updatedUser: EmployeeUser) {
+        val index = users.indexOfFirst { it.id == updatedUser.id }
+        if (index != -1) {
+            users[index] = updatedUser
+        }
+    }
+}

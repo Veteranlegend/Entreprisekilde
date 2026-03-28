@@ -8,7 +8,7 @@ object NotificationRepository {
 
     val notifications = mutableStateListOf<AppNotification>()
 
-    fun addMessageNotification(senderName: String) {
+    fun addMessageNotification(senderName: String, threadId: Int) {
         notifications.add(
             0,
             AppNotification(
@@ -17,7 +17,8 @@ object NotificationRepository {
                 message = "$senderName sent you a message",
                 type = NotificationType.MESSAGE,
                 createdAt = "Now",
-                isRead = false
+                isRead = false,
+                relatedThreadId = threadId
             )
         )
     }
@@ -31,7 +32,8 @@ object NotificationRepository {
                 message = "You assigned \"$taskName\" to $assignedTo",
                 type = NotificationType.TASK_ASSIGNED,
                 createdAt = "Now",
-                isRead = false
+                isRead = false,
+                relatedThreadId = null
             )
         )
     }

@@ -1,274 +1,377 @@
 package com.entreprisekilde.app.ui.admin.profile
-
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.entreprisekilde.app.ui.components.AppBottomNavBar
+import com.entreprisekilde.app.ui.components.BottomNavDestination
 
 @Composable
 fun ProfileScreen(
-    onLogout: () -> Unit = {}
+    email: String,
+    firstName: String,
+    lastName: String,
+    phoneNumber: String,
+    profileImageUri: String? = null,
+    onProfileImageChange: (String?) -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onMessagesClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
-    val pageBackground = Color(0xFFE7DADA)
-    val headerColor = Color(0xFFDFA676)
-    val whitePanel = Color(0xFFF7F7F7)
-    val bottomInactive = Color(0xFF9E9AA7)
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        onProfileImageChange(uri?.toString())
+    }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(pageBackground)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFF5EEE8),
+                        Color(0xFFF9F7F4),
+                        Color(0xFFFFFFFF)
+                    )
+                )
+            )
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFFFDFDFD))
         ) {
-            Text(
-                text = "employee",
-                color = Color(0xFF7E7E7E),
-                fontSize = 14.sp
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFD9A06B))
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Profile",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
 
-            Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .background(Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Person,
+                        contentDescription = "Profile",
+                        tint = Color(0xFF666666),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
 
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(whitePanel)
-                    .padding(horizontal = 14.dp)
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 24.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(headerColor)
-                        .padding(horizontal = 14.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                ProfileImageSection(
+                    profileImageUri = profileImageUri,
+                    onPickImageClick = {
+                        imagePickerLauncher.launch("image/*")
+                    }
+                )
+
+                Spacer(modifier = Modifier.size(28.dp))
+
+                Text(
+                    text = "General",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(bottom = 18.dp)
+                )
+
+                ProfileField(
+                    label = "First name",
+                    value = firstName
+                )
+
+                Spacer(modifier = Modifier.size(10.dp))
+
+                ProfileField(
+                    label = "Last name",
+                    value = lastName
+                )
+
+                Spacer(modifier = Modifier.size(10.dp))
+
+                ProfileField(
+                    label = "Email address",
+                    value = email
+                )
+
+                Spacer(modifier = Modifier.size(10.dp))
+
+                ProfilePhoneField(
+                    label = "Phone number",
+                    value = phoneNumber
+                )
+
+                Spacer(modifier = Modifier.size(28.dp))
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Profile",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.GridView,
-                            contentDescription = null,
-                            tint = Color.Black
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(top = 14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier.size(62.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color(0xFFD3D3D3), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.PersonOutline,
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = Color.Black
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(20.dp)
-                                .background(Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Add,
-                                contentDescription = "Upload",
-                                modifier = Modifier.size(12.dp),
-                                tint = Color.Black
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "General",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        ProfileField("Email address", "tomas.larsen@entreprisekilde.dk")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ProfileField("First name", "Tomas")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ProfileField("Last name", "Larsen")
-                        Spacer(modifier = Modifier.height(10.dp))
-                        ProfilePhoneField("Phone number", "1234123456")
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Button(
-                        onClick = onLogout,
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF0454AD),
-                            contentColor = Color.White
-                        )
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF0F57A8))
+                            .clickable { onLogoutClick() }
+                            .padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "Log Out",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    BottomNavItem("Home", Icons.Outlined.Home, bottomInactive)
-                    BottomNavItem("Message", Icons.Outlined.ChatBubbleOutline, bottomInactive)
-                    BottomNavItem("Notification", Icons.Outlined.Inventory2, bottomInactive)
-                    BottomNavItem("Profile", Icons.Outlined.PersonOutline, Color.Black)
-                }
+                Spacer(modifier = Modifier.size(16.dp))
             }
-        }
-    }
-}
 
-@Composable
-private fun ProfileField(label: String, value: String) {
-    Column {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = Color(0xFF8A8A8A)
-        )
-        Text(
-            text = value,
-            fontSize = 15.sp,
-            color = Color.Black
-        )
-    }
-}
-
-@Composable
-private fun ProfilePhoneField(label: String, value: String) {
-    Column {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = Color(0xFF8A8A8A)
-        )
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Outlined.KeyboardArrowDown,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = Color.Black
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("|", color = Color.Gray)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = value,
-                fontSize = 15.sp,
-                color = Color.Black
+            AppBottomNavBar(
+                selectedItem = BottomNavDestination.PROFILE,
+                onHomeClick = onHomeClick,
+                onMessagesClick = onMessagesClick,
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick
             )
         }
     }
 }
 
 @Composable
-private fun BottomNavItem(
-    label: String,
-    icon: ImageVector,
-    color: Color
+private fun ProfileImageSection(
+    profileImageUri: String?,
+    onPickImageClick: () -> Unit
 ) {
     Column(
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(22.dp)
+        ProfileImageCircle(
+            profileImageUri = profileImageUri,
+            onClick = onPickImageClick
         )
+
+        Spacer(modifier = Modifier.size(12.dp))
+
         Text(
-            text = label,
-            fontSize = 11.sp,
-            color = color
+            text = "Allowed *.jpeg *.jpg, *.png, *.gif",
+            fontSize = 12.sp,
+            color = Color(0xFF98A3B3)
+        )
+
+        Text(
+            text = "max size of 3 Mb",
+            fontSize = 12.sp,
+            color = Color(0xFF98A3B3)
         )
     }
+}
+
+@Composable
+private fun ProfileImageCircle(
+    profileImageUri: String?,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+
+    val bitmapState = produceState<Bitmap?>(initialValue = null, key1 = profileImageUri) {
+        value = if (profileImageUri.isNullOrBlank()) {
+            null
+        } else {
+            runCatching {
+                val uri = Uri.parse(profileImageUri)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(source)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+            }.getOrNull()
+        }
+    }
+
+    val bitmap = bitmapState.value
+
+    Box(
+        modifier = Modifier
+            .size(110.dp)
+            .clip(CircleShape)
+            .background(Color(0xFFE2E6EA))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Profile picture",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Text(
+                text = "Add\nPhoto",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF6E7785),
+                lineHeight = 20.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileField(
+    label: String,
+    value: String
+) {
+    TextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color(0xFFF7F7F8),
+            unfocusedContainerColor = Color(0xFFF7F7F8),
+            disabledContainerColor = Color(0xFFF7F7F8),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.Black,
+            unfocusedTextColor = Color.Black,
+            disabledTextColor = Color.Black,
+            focusedLabelColor = Color(0xFF8F99A7),
+            unfocusedLabelColor = Color(0xFF8F99A7)
+        ),
+        label = {
+            Text(
+                text = label,
+                color = Color(0xFF8F99A7)
+            )
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun ProfilePhoneField(
+    label: String,
+    value: String
+) {
+    TextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        singleLine = true,
+        leadingIcon = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = Color(0xFF8F99A7)
+                )
+                Text(
+                    text = "|",
+                    color = Color(0xFF8F99A7),
+                    fontSize = 22.sp
+                )
+            }
+        },
+        shape = RoundedCornerShape(14.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color(0xFFF7F7F8),
+            unfocusedContainerColor = Color(0xFFF7F7F8),
+            disabledContainerColor = Color(0xFFF7F7F8),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            focusedTextColor = Color.Black,
+            unfocusedTextColor = Color.Black,
+            disabledTextColor = Color.Black,
+            focusedLabelColor = Color(0xFF8F99A7),
+            unfocusedLabelColor = Color(0xFF8F99A7)
+        ),
+        label = {
+            Text(
+                text = label,
+                color = Color(0xFF8F99A7)
+            )
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
 }
