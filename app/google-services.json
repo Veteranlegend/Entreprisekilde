@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "576217865441",
+    "project_id": "entreprisekilde",
+    "storage_bucket": "entreprisekilde.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:576217865441:android:370e3f4c606a9e07a36ba0",
+        "android_client_info": {
+          "package_name": "com.entreprisekilde.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADmmv7dD5cDi5agExdeARlU3VNHPJ37HE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
