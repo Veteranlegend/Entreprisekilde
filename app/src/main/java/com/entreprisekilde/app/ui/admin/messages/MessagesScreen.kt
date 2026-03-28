@@ -1,5 +1,5 @@
 package com.entreprisekilde.app.ui.admin.messages
-
+import com.entreprisekilde.app.data.model.messages.MessageThread
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

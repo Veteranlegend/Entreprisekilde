@@ -1,4 +1,4 @@
-package com.entreprisekilde.app.ui.admin.users
+package com.entreprisekilde.app.data.model.users
 
 data class EmployeeUser(
     val id: Int,

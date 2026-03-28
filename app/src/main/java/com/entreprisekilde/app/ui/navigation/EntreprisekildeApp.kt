@@ -1,18 +1,20 @@
 package com.entreprisekilde.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.entreprisekilde.app.data.repository.TasksRepository
-import com.entreprisekilde.app.data.repository.UserRepository
+import com.entreprisekilde.app.data.repository.messages.MessagesRepository
+import com.entreprisekilde.app.data.repository.tasks.TasksRepository
+import com.entreprisekilde.app.data.repository.timesheet.TimesheetRepository
+import com.entreprisekilde.app.data.repository.users.UserRepository
 import com.entreprisekilde.app.ui.admin.calendar.CalendarDayScreen
 import com.entreprisekilde.app.ui.admin.calendar.CalendarScreen
 import com.entreprisekilde.app.ui.admin.dashboard.AdminDashboardScreen
 import com.entreprisekilde.app.ui.admin.messages.ChatScreen
-import com.entreprisekilde.app.ui.admin.messages.MessagesRepository
 import com.entreprisekilde.app.ui.admin.messages.MessagesScreen
 import com.entreprisekilde.app.ui.admin.messages.MessagesViewModel
 import com.entreprisekilde.app.ui.admin.profile.ProfileScreen
@@ -21,9 +23,11 @@ import com.entreprisekilde.app.ui.admin.tasks.TaskDetailsScreen
 import com.entreprisekilde.app.ui.admin.tasks.TasksScreen
 import com.entreprisekilde.app.ui.admin.tasks.TasksViewModel
 import com.entreprisekilde.app.ui.admin.timesheet.TimesheetEmployeeListScreen
-import com.entreprisekilde.app.ui.admin.timesheet.TimesheetRepository
 import com.entreprisekilde.app.ui.admin.timesheet.TimesheetScreen
 import com.entreprisekilde.app.ui.admin.timesheet.TimesheetViewModel
+import com.entreprisekilde.app.ui.admin.users.CreateUserScreen
+import com.entreprisekilde.app.ui.admin.users.EmployeeScreen
+import com.entreprisekilde.app.ui.admin.users.UserDetailsScreen
 import com.entreprisekilde.app.ui.admin.users.UsersViewModel
 import com.entreprisekilde.app.ui.auth.login.LoginScreen
 import com.entreprisekilde.app.ui.notifications.NotificationScreen
@@ -84,13 +88,21 @@ fun EntreprisekildeApp() {
     val unreadNotificationCount = notificationViewModel.unreadCount()
 
     val selectedTask = tasks.firstOrNull { it.id == selectedTaskId.value }
+    val selectedUser = usersViewModel.selectedUser
+    val loggedInUser = usersViewModel.loggedInUser
 
-    val profileFirstName = "Admin"
-    val profileLastName = ""
-    val profileEmail = "admin@entreprisekilden.dk"
-    val profilePhoneNumber = ""
+    val profileFirstName = loggedInUser?.firstName ?: "Admin"
+    val profileLastName = loggedInUser?.lastName ?: ""
+    val profileEmail = loggedInUser?.email ?: "admin@entreprisekilden.dk"
+    val profilePhoneNumber = loggedInUser?.phoneNumber ?: ""
 
     val timesheetEmployees = timesheetViewModel.getEmployees()
+
+    LaunchedEffect(loggedInUser) {
+        if (loggedInUser != null && currentScreen.value == Screen.Login) {
+            currentScreen.value = Screen.Dashboard
+        }
+    }
 
     val goToDashboard = { currentScreen.value = Screen.Dashboard }
     val goToMessages = { currentScreen.value = Screen.Messages }
@@ -109,9 +121,7 @@ fun EntreprisekildeApp() {
             LoginScreen(
                 errorMessage = usersViewModel.loginErrorMessage,
                 onLoginClick = { username, password ->
-                    if (usersViewModel.login(username, password)) {
-                        currentScreen.value = Screen.Dashboard
-                    }
+                    usersViewModel.login(username, password)
                 }
             )
         }
@@ -209,13 +219,7 @@ fun EntreprisekildeApp() {
                         currentScreen.value = taskDetailsBackTarget.value
                     },
                     assignedUserOptions = users
-                        .mapNotNull { user ->
-                            runCatching {
-                                val usernameField = user::class.java.getDeclaredField("username")
-                                usernameField.isAccessible = true
-                                usernameField.get(user) as? String
-                            }.getOrNull()
-                        }
+                        .map { it.username }
                         .filter { it.isNotBlank() }
                         .distinct(),
                     unreadNotificationCount = unreadNotificationCount,
@@ -305,17 +309,74 @@ fun EntreprisekildeApp() {
                 timesheets = timesheetViewModel.getEntriesForSelectedEmployee(),
                 unreadNotificationCount = unreadNotificationCount,
                 onBack = goToTimesheetEmployees,
-                onApproveEntry = { localIndex ->
-                    timesheetViewModel.approveEntry(localIndex)
+                onApproveEntry = { entryId ->
+                    timesheetViewModel.approveEntry(entryId)
                 },
-                onDeclineEntry = { localIndex ->
-                    timesheetViewModel.declineEntry(localIndex)
+                onDeclineEntry = { entryId ->
+                    timesheetViewModel.declineEntry(entryId)
                 },
-                onDeleteEntry = { localIndex ->
-                    timesheetViewModel.deleteEntry(localIndex)
+                onDeleteEntry = { entryId ->
+                    timesheetViewModel.deleteEntry(entryId)
                 },
                 onAssignShift = { newEntry ->
                     timesheetViewModel.assignShift(newEntry)
+                },
+                onHomeClick = goToDashboard,
+                onMessagesClick = goToMessages,
+                onNotificationsClick = goToNotifications,
+                onProfileClick = goToProfile
+            )
+        }
+
+        Screen.Employees -> {
+            EmployeeScreen(
+                users = users,
+                onBack = goToDashboard,
+                onCreateUserClick = goToCreateUser,
+                onUserClick = { user ->
+                    usersViewModel.selectUser(user)
+                    currentScreen.value = Screen.UserDetails
+                },
+                onHomeClick = goToDashboard,
+                onMessagesClick = goToMessages,
+                onNotificationsClick = goToNotifications,
+                onProfileClick = goToProfile
+            )
+        }
+
+        Screen.UserDetails -> {
+            val user = selectedUser
+            if (user != null) {
+                UserDetailsScreen(
+                    user = user,
+                    onBack = goToUsers,
+                    onSaveUser = { updatedUser ->
+                        usersViewModel.updateUser(updatedUser)
+                        currentScreen.value = Screen.Employees
+                    },
+                    onHomeClick = goToDashboard,
+                    onMessagesClick = goToMessages,
+                    onNotificationsClick = goToNotifications,
+                    onProfileClick = goToProfile
+                )
+            } else {
+                currentScreen.value = Screen.Employees
+            }
+        }
+
+        Screen.CreateUser -> {
+            CreateUserScreen(
+                onBack = goToUsers,
+                onCreateUser = { firstName, lastName, email, phoneNumber, username, password ->
+                    usersViewModel.addUser(
+                        firstName = firstName,
+                        lastName = lastName,
+                        email = email,
+                        phoneNumber = phoneNumber,
+                        username = username,
+                        password = password
+                    )
+                    currentScreen.value = Screen.Employees
                 },
                 onHomeClick = goToDashboard,
                 onMessagesClick = goToMessages,
@@ -336,6 +397,7 @@ fun EntreprisekildeApp() {
                 },
                 onLogoutClick = {
                     selectedTaskId.value = null
+                    usersViewModel.logout()
                     currentScreen.value = Screen.Login
                 },
                 onHomeClick = goToDashboard,

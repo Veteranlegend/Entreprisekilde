@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.ui.admin.timesheet
-
+import com.entreprisekilde.app.data.model.timesheet.TimesheetEntry
+import com.entreprisekilde.app.data.model.timesheet.ShiftApprovalStatus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,7 +41,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,9 +63,9 @@ fun TimesheetScreen(
     timesheets: List<TimesheetEntry>,
     unreadNotificationCount: Int = 0,
     onBack: () -> Unit = {},
-    onApproveEntry: (Int) -> Unit = {},
-    onDeclineEntry: (Int) -> Unit = {},
-    onDeleteEntry: (Int) -> Unit = {},
+    onApproveEntry: (String) -> Unit = {},
+    onDeclineEntry: (String) -> Unit = {},
+    onDeleteEntry: (String) -> Unit = {},
     onAssignShift: (TimesheetEntry) -> Unit = {},
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
@@ -74,8 +74,7 @@ fun TimesheetScreen(
 ) {
     var searchText by remember { mutableStateOf("") }
     var showAssignDialog by remember { mutableStateOf(false) }
-
-    var deleteTargetIndex by remember { mutableIntStateOf(-1) }
+    var deleteTargetId by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     val filteredEntries = timesheets.filter {
@@ -89,7 +88,7 @@ fun TimesheetScreen(
     val sortedEntries = filteredEntries.sortedByDescending { parseTimesheetDate(it.date) }
 
     val pendingEntries = sortedEntries.filter {
-        classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.Pending
+        classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.PENDING
     }
 
     val upcomingEntries = sortedEntries.filter {
@@ -97,11 +96,11 @@ fun TimesheetScreen(
     }
 
     val approvedEntries = sortedEntries.filter {
-        it.approvalStatus == ShiftApprovalStatus.Approved
+        it.approvalStatus == ShiftApprovalStatus.APPROVED
     }
 
     val declinedEntries = sortedEntries.filter {
-        classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.Declined
+        classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.DECLINED
     }
 
     val approvedMinutesTotal = approvedEntries.sumOf {
@@ -109,7 +108,7 @@ fun TimesheetScreen(
     }
 
     val assignedMinutesTotal = sortedEntries
-        .filter { it.approvalStatus != ShiftApprovalStatus.Declined }
+        .filter { it.approvalStatus != ShiftApprovalStatus.DECLINED }
         .sumOf { durationInMinutes(it.fromTime, it.toTime) }
 
     Column(
@@ -255,23 +254,16 @@ fun TimesheetScreen(
                 if (pendingEntries.isNotEmpty()) {
                     item { SectionTitle("Pending review") }
 
-                    items(pendingEntries) { entry ->
-                        val originalIndex = timesheets.indexOf(entry)
+                    items(pendingEntries, key = { it.id }) { entry ->
                         TimesheetCard(
                             entry = entry,
                             showActions = true,
                             showDelete = true,
-                            onApprove = {
-                                if (originalIndex != -1) onApproveEntry(originalIndex)
-                            },
-                            onDecline = {
-                                if (originalIndex != -1) onDeclineEntry(originalIndex)
-                            },
+                            onApprove = { onApproveEntry(entry.id) },
+                            onDecline = { onDeclineEntry(entry.id) },
                             onDelete = {
-                                if (originalIndex != -1) {
-                                    deleteTargetIndex = originalIndex
-                                    showDeleteDialog = true
-                                }
+                                deleteTargetId = entry.id
+                                showDeleteDialog = true
                             }
                         )
                     }
@@ -280,17 +272,14 @@ fun TimesheetScreen(
                 if (upcomingEntries.isNotEmpty()) {
                     item { SectionTitle("Upcoming shifts") }
 
-                    items(upcomingEntries) { entry ->
-                        val originalIndex = timesheets.indexOf(entry)
+                    items(upcomingEntries, key = { it.id }) { entry ->
                         TimesheetCard(
                             entry = entry,
                             showActions = false,
                             showDelete = true,
                             onDelete = {
-                                if (originalIndex != -1) {
-                                    deleteTargetIndex = originalIndex
-                                    showDeleteDialog = true
-                                }
+                                deleteTargetId = entry.id
+                                showDeleteDialog = true
                             }
                         )
                     }
@@ -299,7 +288,7 @@ fun TimesheetScreen(
                 if (approvedEntries.isNotEmpty()) {
                     item { SectionTitle("Approved") }
 
-                    items(approvedEntries) { entry ->
+                    items(approvedEntries, key = { it.id }) { entry ->
                         TimesheetCard(
                             entry = entry,
                             showActions = false,
@@ -311,7 +300,7 @@ fun TimesheetScreen(
                 if (declinedEntries.isNotEmpty()) {
                     item { SectionTitle("Declined") }
 
-                    items(declinedEntries) { entry ->
+                    items(declinedEntries, key = { it.id }) { entry ->
                         TimesheetCard(
                             entry = entry,
                             showActions = false,
@@ -372,7 +361,7 @@ fun TimesheetScreen(
         AlertDialog(
             onDismissRequest = {
                 showDeleteDialog = false
-                deleteTargetIndex = -1
+                deleteTargetId = null
             },
             title = {
                 Text(
@@ -386,11 +375,9 @@ fun TimesheetScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (deleteTargetIndex != -1) {
-                            onDeleteEntry(deleteTargetIndex)
-                        }
+                        deleteTargetId?.let { onDeleteEntry(it) }
                         showDeleteDialog = false
-                        deleteTargetIndex = -1
+                        deleteTargetId = null
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFE58C8C),
@@ -405,7 +392,7 @@ fun TimesheetScreen(
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
-                        deleteTargetIndex = -1
+                        deleteTargetId = null
                     }
                 ) {
                     Text("Cancel")
@@ -449,22 +436,22 @@ private fun TimesheetCard(
 
     val borderColor = when {
         shiftType == "future" -> Color(0xFF8BB8F2)
-        entry.approvalStatus == ShiftApprovalStatus.Approved -> Color(0xFF88C999)
-        entry.approvalStatus == ShiftApprovalStatus.Pending -> Color(0xFFE0C57A)
+        entry.approvalStatus == ShiftApprovalStatus.APPROVED -> Color(0xFF88C999)
+        entry.approvalStatus == ShiftApprovalStatus.PENDING -> Color(0xFFE0C57A)
         else -> Color(0xFFE59A9A)
     }
 
     val statusChipColor = when {
         shiftType == "future" -> Color(0xFFD7E9FF)
-        entry.approvalStatus == ShiftApprovalStatus.Approved -> Color(0xFFDDF5E2)
-        entry.approvalStatus == ShiftApprovalStatus.Pending -> Color(0xFFF8EDC3)
+        entry.approvalStatus == ShiftApprovalStatus.APPROVED -> Color(0xFFDDF5E2)
+        entry.approvalStatus == ShiftApprovalStatus.PENDING -> Color(0xFFF8EDC3)
         else -> Color(0xFFF7D7D7)
     }
 
     val statusText = when {
         shiftType == "future" -> "Upcoming"
-        entry.approvalStatus == ShiftApprovalStatus.Approved -> "Approved"
-        entry.approvalStatus == ShiftApprovalStatus.Pending -> "Pending"
+        entry.approvalStatus == ShiftApprovalStatus.APPROVED -> "Approved"
+        entry.approvalStatus == ShiftApprovalStatus.PENDING -> "Pending"
         else -> "Declined"
     }
 
@@ -633,7 +620,7 @@ private fun AssignShiftDialog(
                             employeeName = employeeName,
                             submittedHours = 0,
                             assignedHours = hours,
-                            approvalStatus = ShiftApprovalStatus.Pending
+                            approvalStatus = ShiftApprovalStatus.PENDING
                         )
                     )
                 }

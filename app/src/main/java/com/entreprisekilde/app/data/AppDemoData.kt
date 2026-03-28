@@ -1,17 +1,15 @@
 package com.entreprisekilde.app.data
-
+import com.entreprisekilde.app.data.model.timesheet.ShiftApprovalStatus
+import com.entreprisekilde.app.data.model.timesheet.TimesheetEntry
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
-import com.entreprisekilde.app.ui.admin.messages.ChatMessage
-import com.entreprisekilde.app.ui.admin.messages.MessageThread
-import com.entreprisekilde.app.ui.admin.timesheet.ShiftApprovalStatus
-import com.entreprisekilde.app.ui.admin.timesheet.TimesheetEntry
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-
-object AppDemoData {
+import com.entreprisekilde.app.data.model.messages.ChatMessage
+import com.entreprisekilde.app.data.model.messages.MessageThread
+object DemoSeedData {
 
     fun createTasks() = mutableStateListOf(
         TaskData(
@@ -107,13 +105,76 @@ object AppDemoData {
         val today = LocalDate.now()
 
         mutableStateListOf(
-            TimesheetEntry(today.format(formatter), "09:30 AM", "06:30 PM", "Rasmus Jensen", 9, 9, ShiftApprovalStatus.Pending),
-            TimesheetEntry(today.minusDays(1).format(formatter), "09:30 AM", "06:30 PM", "Rasmus Jensen", 9, 9, ShiftApprovalStatus.Approved),
-            TimesheetEntry(today.minusDays(2).format(formatter), "09:30 AM", "06:30 PM", "Rasmus Jensen", 8, 9, ShiftApprovalStatus.Pending),
-            TimesheetEntry(today.plusDays(1).format(formatter), "09:30 AM", "06:30 PM", "Rasmus Jensen", 0, 9, ShiftApprovalStatus.Pending),
-            TimesheetEntry(today.minusDays(1).format(formatter), "08:00 AM", "04:00 PM", "John Miller", 8, 8, ShiftApprovalStatus.Approved),
-            TimesheetEntry(today.plusDays(2).format(formatter), "10:00 AM", "06:00 PM", "John Miller", 0, 8, ShiftApprovalStatus.Pending),
-            TimesheetEntry(today.format(formatter), "09:00 AM", "05:30 PM", "Peter Hansen", 8, 8, ShiftApprovalStatus.Pending)
+            TimesheetEntry(
+                id = "timesheet_1",
+                date = today.format(formatter),
+                fromTime = "09:30 AM",
+                toTime = "06:30 PM",
+                employeeName = "Rasmus Jensen",
+                submittedHours = 9,
+                assignedHours = 9,
+                approvalStatus = ShiftApprovalStatus.PENDING
+            ),
+            TimesheetEntry(
+                id = "timesheet_2",
+                date = today.minusDays(1).format(formatter),
+                fromTime = "09:30 AM",
+                toTime = "06:30 PM",
+                employeeName = "Rasmus Jensen",
+                submittedHours = 9,
+                assignedHours = 9,
+                approvalStatus = ShiftApprovalStatus.APPROVED
+            ),
+            TimesheetEntry(
+                id = "timesheet_3",
+                date = today.minusDays(2).format(formatter),
+                fromTime = "09:30 AM",
+                toTime = "06:30 PM",
+                employeeName = "Rasmus Jensen",
+                submittedHours = 8,
+                assignedHours = 9,
+                approvalStatus = ShiftApprovalStatus.PENDING
+            ),
+            TimesheetEntry(
+                id = "timesheet_4",
+                date = today.plusDays(1).format(formatter),
+                fromTime = "09:30 AM",
+                toTime = "06:30 PM",
+                employeeName = "Rasmus Jensen",
+                submittedHours = 0,
+                assignedHours = 9,
+                approvalStatus = ShiftApprovalStatus.PENDING
+            ),
+            TimesheetEntry(
+                id = "timesheet_5",
+                date = today.minusDays(1).format(formatter),
+                fromTime = "08:00 AM",
+                toTime = "04:00 PM",
+                employeeName = "John Miller",
+                submittedHours = 8,
+                assignedHours = 8,
+                approvalStatus = ShiftApprovalStatus.APPROVED
+            ),
+            TimesheetEntry(
+                id = "timesheet_6",
+                date = today.plusDays(2).format(formatter),
+                fromTime = "10:00 AM",
+                toTime = "06:00 PM",
+                employeeName = "John Miller",
+                submittedHours = 0,
+                assignedHours = 8,
+                approvalStatus = ShiftApprovalStatus.PENDING
+            ),
+            TimesheetEntry(
+                id = "timesheet_7",
+                date = today.format(formatter),
+                fromTime = "09:00 AM",
+                toTime = "05:30 PM",
+                employeeName = "Peter Hansen",
+                submittedHours = 8,
+                assignedHours = 8,
+                approvalStatus = ShiftApprovalStatus.PENDING
+            )
         )
     }
 }

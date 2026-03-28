@@ -1,5 +1,5 @@
-package com.entreprisekilde.app.ui.admin.timesheet
-
+package com.entreprisekilde.app.data.model.timesheet
+import com.entreprisekilde.app.data.repository.timesheet.TimesheetRepository
 import java.util.UUID
 
 enum class ShiftApprovalStatus {

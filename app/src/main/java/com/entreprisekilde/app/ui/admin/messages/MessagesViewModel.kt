@@ -1,22 +1,29 @@
 package com.entreprisekilde.app.ui.admin.messages
 
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.entreprisekilde.app.data.model.messages.ChatMessage
+import com.entreprisekilde.app.data.model.messages.MessageThread
+import com.entreprisekilde.app.data.repository.messages.MessagesRepository
+import kotlinx.coroutines.launch
 
 class MessagesViewModel(
     private val repository: MessagesRepository
 ) : ViewModel() {
 
-    val messageThreads = repository.getThreads()
+    val messageThreads = mutableStateListOf<MessageThread>()
+    val currentMessages = mutableStateListOf<ChatMessage>()
     val selectedThread = mutableStateOf<MessageThread?>(null)
+
+    init {
+        loadThreads()
+    }
 
     fun selectThread(thread: MessageThread) {
         selectedThread.value = thread
-
-        val index = messageThreads.indexOfFirst { it.id == thread.id }
-        if (index != -1) {
-            messageThreads[index] = messageThreads[index].copy(unreadCount = 0)
-        }
+        loadMessages(thread.id)
     }
 
     fun selectThreadById(threadId: Int): Boolean {
@@ -26,18 +33,49 @@ class MessagesViewModel(
     }
 
     fun deleteThread(thread: MessageThread) {
-        repository.deleteThread(thread)
+        viewModelScope.launch {
+            repository.deleteThread(thread.id)
+            refreshThreads()
 
-        if (selectedThread.value?.id == thread.id) {
-            selectedThread.value = null
+            if (selectedThread.value?.id == thread.id) {
+                selectedThread.value = null
+                currentMessages.clear()
+            }
         }
     }
 
-    fun getMessagesForSelectedThread() =
-        selectedThread.value?.let { repository.getMessages(it.id) }
+    fun getMessagesForSelectedThread() = currentMessages
 
     fun sendMessage(message: String) {
         val thread = selectedThread.value ?: return
-        repository.sendMessage(thread, message)
+
+        viewModelScope.launch {
+            repository.sendMessage(thread.id, message)
+            refreshThreads()
+
+            val updatedThread = repository.findThreadById(thread.id)
+            selectedThread.value = updatedThread
+
+            loadMessages(thread.id)
+        }
+    }
+
+    private fun loadThreads() {
+        viewModelScope.launch {
+            messageThreads.clear()
+            messageThreads.addAll(repository.getThreads())
+        }
+    }
+
+    private fun loadMessages(threadId: Int) {
+        viewModelScope.launch {
+            currentMessages.clear()
+            currentMessages.addAll(repository.getMessages(threadId))
+        }
+    }
+
+    private suspend fun refreshThreads() {
+        messageThreads.clear()
+        messageThreads.addAll(repository.getThreads())
     }
 }

@@ -1,13 +1,12 @@
-package com.entreprisekilde.app.data.repository
+package com.entreprisekilde.app.data.repository.users
 
-import androidx.compose.runtime.mutableStateListOf
-import com.entreprisekilde.app.ui.admin.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.EmployeeUser
 
 class UserRepository {
 
     private var nextId = 7
 
-    private val users = mutableStateListOf(
+    private val users = mutableListOf(
         EmployeeUser(
             id = 1,
             firstName = "Rasmus",
@@ -70,17 +69,17 @@ class UserRepository {
         )
     )
 
-    fun getUsers(): List<EmployeeUser> {
-        return users
+    suspend fun getUsers(): List<EmployeeUser> {
+        return users.toList()
     }
 
-    fun login(username: String, password: String): EmployeeUser? {
+    suspend fun login(username: String, password: String): EmployeeUser? {
         return users.find {
             it.username == username && it.password == password
         }
     }
 
-    fun addUser(
+    suspend fun addUser(
         firstName: String,
         lastName: String,
         email: String,
@@ -102,7 +101,7 @@ class UserRepository {
         users.add(newUser)
     }
 
-    fun updateUser(updatedUser: EmployeeUser) {
+    suspend fun updateUser(updatedUser: EmployeeUser) {
         val index = users.indexOfFirst { it.id == updatedUser.id }
         if (index != -1) {
             users[index] = updatedUser
