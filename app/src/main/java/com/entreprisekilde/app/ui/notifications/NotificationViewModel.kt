@@ -1,38 +1,74 @@
 package com.entreprisekilde.app.ui.notifications
 
+import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.entreprisekilde.app.data.model.notifications.AppNotification
+import com.entreprisekilde.app.data.repository.notifications.NotificationRepository
+import kotlinx.coroutines.launch
 
 class NotificationViewModel : ViewModel() {
 
-    val notifications = NotificationRepository.notifications
+    val notifications = mutableStateListOf<AppNotification>()
+
+    init {
+        loadNotifications()
+    }
 
     fun unreadCount(): Int {
-        return NotificationRepository.unreadCount()
+        return notifications.count { !it.isRead }
     }
 
     fun addMessageNotification(senderName: String, threadId: Int) {
-        NotificationRepository.addMessageNotification(
-            senderName = senderName,
-            threadId = threadId
-        )
+        viewModelScope.launch {
+            NotificationRepository.addMessageNotification(
+                senderName = senderName,
+                threadId = threadId
+            )
+            refreshNotifications()
+        }
     }
 
     fun addTaskAssignedNotification(taskName: String, assignedTo: String) {
-        NotificationRepository.addTaskAssignedNotification(
-            taskName = taskName,
-            assignedTo = assignedTo
-        )
+        viewModelScope.launch {
+            NotificationRepository.addTaskAssignedNotification(
+                taskName = taskName,
+                assignedTo = assignedTo
+            )
+            refreshNotifications()
+        }
     }
 
     fun markAsRead(notificationId: Int) {
-        NotificationRepository.markAsRead(notificationId)
+        viewModelScope.launch {
+            NotificationRepository.markAsRead(notificationId)
+            refreshNotifications()
+        }
     }
 
     fun markAllAsRead() {
-        NotificationRepository.markAllAsRead()
+        viewModelScope.launch {
+            NotificationRepository.markAllAsRead()
+            refreshNotifications()
+        }
     }
 
     fun deleteNotification(notificationId: Int) {
-        NotificationRepository.deleteNotification(notificationId)
+        viewModelScope.launch {
+            NotificationRepository.deleteNotification(notificationId)
+            refreshNotifications()
+        }
+    }
+
+    private fun loadNotifications() {
+        viewModelScope.launch {
+            notifications.clear()
+            notifications.addAll(NotificationRepository.getNotifications())
+        }
+    }
+
+    private suspend fun refreshNotifications() {
+        notifications.clear()
+        notifications.addAll(NotificationRepository.getNotifications())
     }
 }

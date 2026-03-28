@@ -1,14 +1,19 @@
-package com.entreprisekilde.app.ui.notifications
+package com.entreprisekilde.app.data.repository.notifications
 
-import androidx.compose.runtime.mutableStateListOf
+import com.entreprisekilde.app.data.model.notifications.AppNotification
+import com.entreprisekilde.app.data.model.notifications.NotificationType
 
 object NotificationRepository {
 
     private var nextId = 1
 
-    val notifications = mutableStateListOf<AppNotification>()
+    private val notifications = mutableListOf<AppNotification>()
 
-    fun addMessageNotification(senderName: String, threadId: Int) {
+    suspend fun getNotifications(): List<AppNotification> {
+        return notifications.toList()
+    }
+
+    suspend fun addMessageNotification(senderName: String, threadId: Int) {
         notifications.add(
             0,
             AppNotification(
@@ -23,7 +28,7 @@ object NotificationRepository {
         )
     }
 
-    fun addTaskAssignedNotification(taskName: String, assignedTo: String) {
+    suspend fun addTaskAssignedNotification(taskName: String, assignedTo: String) {
         notifications.add(
             0,
             AppNotification(
@@ -38,14 +43,14 @@ object NotificationRepository {
         )
     }
 
-    fun markAsRead(notificationId: Int) {
+    suspend fun markAsRead(notificationId: Int) {
         val index = notifications.indexOfFirst { it.id == notificationId }
         if (index != -1) {
             notifications[index] = notifications[index].copy(isRead = true)
         }
     }
 
-    fun markAllAsRead() {
+    suspend fun markAllAsRead() {
         notifications.indices.forEach { index ->
             val item = notifications[index]
             if (!item.isRead) {
@@ -54,11 +59,11 @@ object NotificationRepository {
         }
     }
 
-    fun unreadCount(): Int {
+    suspend fun unreadCount(): Int {
         return notifications.count { !it.isRead }
     }
 
-    fun deleteNotification(notificationId: Int) {
+    suspend fun deleteNotification(notificationId: Int) {
         notifications.removeAll { it.id == notificationId }
     }
 }

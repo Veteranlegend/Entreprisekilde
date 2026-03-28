@@ -31,7 +31,7 @@ import com.entreprisekilde.app.ui.admin.users.UserDetailsScreen
 import com.entreprisekilde.app.ui.admin.users.UsersViewModel
 import com.entreprisekilde.app.ui.auth.login.LoginScreen
 import com.entreprisekilde.app.ui.notifications.NotificationScreen
-import com.entreprisekilde.app.ui.notifications.NotificationType
+import com.entreprisekilde.app.data.model.notifications.NotificationType
 import com.entreprisekilde.app.ui.notifications.NotificationViewModel
 
 @Composable

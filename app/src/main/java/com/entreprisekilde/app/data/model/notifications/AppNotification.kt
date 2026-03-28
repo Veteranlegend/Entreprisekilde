@@ -1,5 +1,5 @@
-package com.entreprisekilde.app.ui.notifications
 
+package com.entreprisekilde.app.data.model.notifications
 data class AppNotification(
     val id: Int,
     val title: String,
