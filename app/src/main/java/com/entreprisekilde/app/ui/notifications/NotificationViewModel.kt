@@ -7,7 +7,9 @@ import com.entreprisekilde.app.data.model.notifications.AppNotification
 import com.entreprisekilde.app.data.repository.notifications.NotificationRepository
 import kotlinx.coroutines.launch
 
-class NotificationViewModel : ViewModel() {
+class NotificationViewModel(
+    private val repository: NotificationRepository
+) : ViewModel() {
 
     val notifications = mutableStateListOf<AppNotification>()
 
@@ -21,7 +23,7 @@ class NotificationViewModel : ViewModel() {
 
     fun addMessageNotification(senderName: String, threadId: Int) {
         viewModelScope.launch {
-            NotificationRepository.addMessageNotification(
+            repository.addMessageNotification(
                 senderName = senderName,
                 threadId = threadId
             )
@@ -31,7 +33,7 @@ class NotificationViewModel : ViewModel() {
 
     fun addTaskAssignedNotification(taskName: String, assignedTo: String) {
         viewModelScope.launch {
-            NotificationRepository.addTaskAssignedNotification(
+            repository.addTaskAssignedNotification(
                 taskName = taskName,
                 assignedTo = assignedTo
             )
@@ -41,21 +43,21 @@ class NotificationViewModel : ViewModel() {
 
     fun markAsRead(notificationId: Int) {
         viewModelScope.launch {
-            NotificationRepository.markAsRead(notificationId)
+            repository.markAsRead(notificationId)
             refreshNotifications()
         }
     }
 
     fun markAllAsRead() {
         viewModelScope.launch {
-            NotificationRepository.markAllAsRead()
+            repository.markAllAsRead()
             refreshNotifications()
         }
     }
 
     fun deleteNotification(notificationId: Int) {
         viewModelScope.launch {
-            NotificationRepository.deleteNotification(notificationId)
+            repository.deleteNotification(notificationId)
             refreshNotifications()
         }
     }
@@ -63,12 +65,12 @@ class NotificationViewModel : ViewModel() {
     private fun loadNotifications() {
         viewModelScope.launch {
             notifications.clear()
-            notifications.addAll(NotificationRepository.getNotifications())
+            notifications.addAll(repository.getNotifications())
         }
     }
 
     private suspend fun refreshNotifications() {
         notifications.clear()
-        notifications.addAll(NotificationRepository.getNotifications())
+        notifications.addAll(repository.getNotifications())
     }
 }

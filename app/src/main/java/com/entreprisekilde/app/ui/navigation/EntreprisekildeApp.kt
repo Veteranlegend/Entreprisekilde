@@ -1,5 +1,5 @@
 package com.entreprisekilde.app.ui.navigation
-
+import com.entreprisekilde.app.data.repository.timesheet.DemoTimesheetRepository
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -7,12 +7,10 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.entreprisekilde.app.data.repository.messages.MessagesRepository
-import com.entreprisekilde.app.data.repository.tasks.TasksRepository
-import com.entreprisekilde.app.data.repository.timesheet.TimesheetRepository
-import com.entreprisekilde.app.data.repository.users.UserRepository
+import com.entreprisekilde.app.data.repository.users.DemoUsersRepository
 import com.entreprisekilde.app.ui.admin.calendar.CalendarDayScreen
 import com.entreprisekilde.app.ui.admin.calendar.CalendarScreen
+import com.entreprisekilde.app.data.repository.tasks.DemoTasksRepository
 import com.entreprisekilde.app.ui.admin.dashboard.AdminDashboardScreen
 import com.entreprisekilde.app.ui.admin.messages.ChatScreen
 import com.entreprisekilde.app.ui.admin.messages.MessagesScreen
@@ -33,7 +31,8 @@ import com.entreprisekilde.app.ui.auth.login.LoginScreen
 import com.entreprisekilde.app.ui.notifications.NotificationScreen
 import com.entreprisekilde.app.data.model.notifications.NotificationType
 import com.entreprisekilde.app.ui.notifications.NotificationViewModel
-
+import com.entreprisekilde.app.data.repository.messages.DemoMessagesRepository
+import com.entreprisekilde.app.data.repository.notifications.DemoNotificationRepository
 @Composable
 fun EntreprisekildeApp() {
 
@@ -43,10 +42,13 @@ fun EntreprisekildeApp() {
     val profileImageUri = remember { mutableStateOf<String?>(null) }
     val selectedTaskId = remember { mutableStateOf<String?>(null) }
 
-    val userRepository = remember { UserRepository() }
-    val tasksRepository = remember { TasksRepository() }
-    val messagesRepository = remember { MessagesRepository() }
-    val timesheetRepository = remember { TimesheetRepository() }
+
+    val userRepository = remember { DemoUsersRepository() }
+    val tasksRepository = remember { DemoTasksRepository() }
+    val messagesRepository = remember { DemoMessagesRepository() }
+    val timesheetRepository = remember { DemoTimesheetRepository() }
+    val notificationRepository = remember { DemoNotificationRepository() }
+
 
     val usersViewModel: UsersViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -80,7 +82,15 @@ fun EntreprisekildeApp() {
         }
     )
 
-    val notificationViewModel: NotificationViewModel = viewModel()
+
+
+    val notificationViewModel: NotificationViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return NotificationViewModel(notificationRepository) as T
+            }
+        }
+    )
 
     val users = usersViewModel.users
     val tasks = tasksViewModel.tasks
