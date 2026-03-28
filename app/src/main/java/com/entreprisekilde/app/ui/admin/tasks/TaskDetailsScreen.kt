@@ -1,5 +1,7 @@
 package com.entreprisekilde.app.ui.admin.tasks
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +61,8 @@ fun TaskDetailsScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+
     var customer by remember(task.id) { mutableStateOf(task.customer) }
     var phoneNumber by remember(task.id) { mutableStateOf(task.phoneNumber) }
     var address by remember(task.id) { mutableStateOf(task.address) }
@@ -160,10 +166,17 @@ fun TaskDetailsScreen(
                         onValueChange = { phoneNumber = it }
                     )
 
-                    EditableField(
-                        label = "Address",
+                    AddressField(
                         value = address,
-                        onValueChange = { address = it }
+                        onValueChange = { address = it },
+                        onOpenMaps = {
+                            val trimmedAddress = address.trim()
+                            if (trimmedAddress.isNotEmpty()) {
+                                val gmmIntentUri = Uri.parse("geo:0,0?q=${Uri.encode(trimmedAddress)}")
+                                val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+                                context.startActivity(mapIntent)
+                            }
+                        }
                     )
 
                     EditableField(
@@ -336,6 +349,62 @@ private fun EditableField(
                 unfocusedContainerColor = Color.White
             )
         )
+    }
+}
+
+@Composable
+private fun AddressField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onOpenMaps: () -> Unit
+) {
+    Column {
+        Text(
+            text = "Address",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF444444)
+        )
+
+        Spacer(modifier = Modifier.size(6.dp))
+
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White
+            )
+        )
+
+        if (value.trim().isNotEmpty()) {
+            Spacer(modifier = Modifier.size(8.dp))
+
+            Row(
+                modifier = Modifier
+                    .clickable { onOpenMaps() }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.LocationOn,
+                    contentDescription = "Open in Maps",
+                    tint = Color(0xFF2F6DB3),
+                    modifier = Modifier.size(18.dp)
+                )
+
+                Spacer(modifier = Modifier.size(6.dp))
+
+                Text(
+                    text = "Open in Maps",
+                    color = Color(0xFF2F6DB3),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
     }
 }
 
