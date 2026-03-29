@@ -1,7 +1,10 @@
 package com.entreprisekilde.app.ui.admin.tasks
 
+import android.app.DatePickerDialog
+import android.widget.DatePicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,8 +26,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AddTask
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,27 +52,54 @@ import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
+import java.util.Calendar
 
 @Composable
 fun CreateTaskScreen(
     unreadNotificationCount: Int = 0,
     onBack: () -> Unit = {},
     onCreateTask: (TaskData) -> Unit = {},
+    assignedUserOptions: List<String> = emptyList(),
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+
     var customer by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var assignTo by remember { mutableStateOf("") }
     var taskDetails by remember { mutableStateOf("") }
+    var assignToExpanded by remember { mutableStateOf(false) }
 
     val headerColor = Color(0xFFE0A673)
     val buttonColor = Color(0xFFCFE0D0)
     val buttonTextColor = Color(0xFF3F6E48)
+
+    val calendar = remember { Calendar.getInstance() }
+
+    val datePickerDialog = remember {
+        DatePickerDialog(
+            context,
+            { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
+                val formattedMonth = (month + 1).toString().padStart(2, '0')
+                val formattedDay = dayOfMonth.toString().padStart(2, '0')
+                date = "$year-$formattedMonth-$formattedDay"
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            try {
+                datePicker.calendarViewShown = true
+                datePicker.spinnersShown = false
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -140,16 +175,23 @@ fun CreateTaskScreen(
                 onValueChange = { address = it }
             )
 
-            SmallField(
+            DateSelectorField(
                 label = "Date",
                 value = date,
-                onValueChange = { date = it }
+                onClick = { datePickerDialog.show() }
             )
 
-            SmallField(
+            AssignToSelectorField(
                 label = "Assign To",
                 value = assignTo,
-                onValueChange = { assignTo = it }
+                options = assignedUserOptions,
+                expanded = assignToExpanded,
+                onExpand = { assignToExpanded = true },
+                onDismiss = { assignToExpanded = false },
+                onSelect = { selectedUser ->
+                    assignTo = selectedUser
+                    assignToExpanded = false
+                }
             )
 
             SmallField(
@@ -167,12 +209,12 @@ fun CreateTaskScreen(
                     onCreateTask(
                         TaskData(
                             id = "",
-                            customer = customer,
-                            phoneNumber = phoneNumber,
-                            address = address,
+                            customer = customer.trim(),
+                            phoneNumber = phoneNumber.trim(),
+                            address = address.trim(),
                             date = date,
                             assignTo = assignTo,
-                            taskDetails = taskDetails,
+                            taskDetails = taskDetails.trim(),
                             status = TaskStatus.PENDING
                         )
                     )
@@ -241,5 +283,129 @@ private fun SmallField(
                 unfocusedTextColor = Color.Black
             )
         )
+    }
+}
+
+@Composable
+private fun DateSelectorField(
+    label: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            color = Color(0xFF444444),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                placeholder = { Text("Select date") },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarToday,
+                        contentDescription = "Select date",
+                        tint = Color(0xFF666666)
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = Color(0xFF9AA0A6),
+                    unfocusedBorderColor = Color(0xFF9AA0A6),
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                )
+            )
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onClick() }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AssignToSelectorField(
+    label: String,
+    value: String,
+    options: List<String>,
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            color = Color(0xFF444444),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                placeholder = { Text("Select employee") },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowDropDown,
+                        contentDescription = "Open employee list",
+                        tint = Color(0xFF666666)
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = Color(0xFF9AA0A6),
+                    unfocusedBorderColor = Color(0xFF9AA0A6),
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                )
+            )
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onExpand() }
+            )
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = onDismiss
+            ) {
+                options.forEach { userName ->
+                    DropdownMenuItem(
+                        text = { Text(userName) },
+                        onClick = { onSelect(userName) }
+                    )
+                }
+            }
+        }
     }
 }

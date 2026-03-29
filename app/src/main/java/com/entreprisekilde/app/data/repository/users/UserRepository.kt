@@ -8,6 +8,16 @@ interface UserRepository {
 
     suspend fun login(username: String, password: String): EmployeeUser?
 
+    suspend fun getUserById(userId: String): EmployeeUser?
+
+    fun getCurrentAuthUserId(): String?
+
+    fun observeAuthState(onAuthUserChanged: (String?) -> Unit)
+
+    fun stopObservingAuthState()
+
+    fun logout()
+
     suspend fun addUser(
         firstName: String,
         lastName: String,

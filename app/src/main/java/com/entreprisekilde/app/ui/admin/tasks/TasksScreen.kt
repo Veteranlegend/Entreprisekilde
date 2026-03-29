@@ -1,5 +1,7 @@
 package com.entreprisekilde.app.ui.admin.tasks
 
+import android.app.DatePickerDialog
+import android.widget.DatePicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,21 +25,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,15 +55,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
+import java.util.Calendar
 
 @Composable
 fun TasksScreen(
     tasks: List<TaskData>,
+    assignedUserOptions: List<String> = emptyList(),
+    isLoading: Boolean = false,
+    errorMessage: String? = null,
+    onRetry: () -> Unit = {},
     onBack: () -> Unit = {},
     onCreateTaskClick: () -> Unit = {},
     onDeleteTask: (String) -> Unit = {},
@@ -81,6 +93,13 @@ fun TasksScreen(
                 task.status.name.contains(searchQuery, ignoreCase = true) ||
                 taskStatusLabel(task.status).contains(searchQuery, ignoreCase = true)
     }
+
+    val sortedTasks = filteredTasks.sortedWith(
+        compareBy<TaskData>(
+            { statusSortOrder(it.status) },
+            { -dateToSortableNumber(it.date) }
+        )
+    )
 
     Column(
         modifier = Modifier
@@ -147,20 +166,76 @@ fun TasksScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                items(filteredTasks, key = { it.id }) { task ->
-                    TaskCard(
-                        task = task,
-                        onClick = { onTaskClick(task) },
-                        onDeleteClick = { taskPendingDelete = task },
-                        onStatusChange = { newStatus ->
-                            onStatusChange(task.id, newStatus)
-                        },
-                        onQuickUpdateTask = onQuickUpdateTask
-                    )
+                when {
+                    isLoading -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Loading tasks...",
+                                color = Color(0xFF555555)
+                            )
+                        }
+                    }
+
+                    !errorMessage.isNullOrBlank() -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = errorMessage,
+                                color = Color(0xFFB3261E),
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = onRetry,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF79A7D8),
+                                    contentColor = Color.Black
+                                )
+                            ) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+
+                    sortedTasks.isEmpty() -> {
+                        Text(
+                            text = "No tasks found.",
+                            color = Color(0xFF666666),
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    else -> {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(sortedTasks, key = { it.id }) { task ->
+                                TaskCard(
+                                    task = task,
+                                    assignedUserOptions = assignedUserOptions,
+                                    onClick = { onTaskClick(task) },
+                                    onDeleteClick = { taskPendingDelete = task },
+                                    onStatusChange = { newStatus ->
+                                        onStatusChange(task.id, newStatus)
+                                    },
+                                    onQuickUpdateTask = onQuickUpdateTask
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -248,21 +323,38 @@ fun TasksScreen(
 @Composable
 private fun TaskCard(
     task: TaskData,
+    assignedUserOptions: List<String>,
     onClick: () -> Unit = {},
     onDeleteClick: () -> Unit = {},
     onStatusChange: (TaskStatus) -> Unit = {},
     onQuickUpdateTask: (TaskData) -> Unit = {}
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    var showEditDateDialog by remember { mutableStateOf(false) }
-    var showEditAssignDialog by remember { mutableStateOf(false) }
-    var editedDate by remember(task.id, task.date) { mutableStateOf(task.date) }
-    var editedAssignTo by remember(task.id, task.assignTo) { mutableStateOf(task.assignTo) }
+    val context = LocalContext.current
+
+    var statusExpanded by remember { mutableStateOf(false) }
+    var assignExpanded by remember { mutableStateOf(false) }
 
     val statusColor = when (task.status) {
         TaskStatus.PENDING -> Color(0xFFE5E7EB)
         TaskStatus.IN_PROGRESS -> Color(0xFFF2E2A8)
         TaskStatus.COMPLETED -> Color(0xFFC7EBC4)
+    }
+
+    val calendar = remember { Calendar.getInstance() }
+
+    val datePickerDialog = remember(task.id, task.date) {
+        DatePickerDialog(
+            context,
+            { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
+                val formattedMonth = (month + 1).toString().padStart(2, '0')
+                val formattedDay = dayOfMonth.toString().padStart(2, '0')
+                val newDate = "$year-$formattedMonth-$formattedDay"
+                onQuickUpdateTask(task.copy(date = newDate))
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
     }
 
     Column(
@@ -286,7 +378,7 @@ private fun TaskCard(
                 Box(
                     modifier = Modifier
                         .background(statusColor, RoundedCornerShape(50))
-                        .clickable { expanded = true }
+                        .clickable { statusExpanded = true }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
@@ -297,8 +389,8 @@ private fun TaskCard(
                 }
 
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    expanded = statusExpanded,
+                    onDismissRequest = { statusExpanded = false }
                 ) {
                     listOf(
                         TaskStatus.PENDING,
@@ -309,7 +401,7 @@ private fun TaskCard(
                             text = { Text(taskStatusLabel(value)) },
                             onClick = {
                                 onStatusChange(value)
-                                expanded = false
+                                statusExpanded = false
                             }
                         )
                     }
@@ -335,12 +427,12 @@ private fun TaskCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = Modifier.clickable { showEditDateDialog = true },
+                modifier = Modifier.clickable { datePickerDialog.show() },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Schedule,
-                    contentDescription = null,
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = "Change date",
                     modifier = Modifier.size(16.dp)
                 )
 
@@ -349,6 +441,14 @@ private fun TaskCard(
                 Text(
                     text = task.date,
                     fontSize = 13.sp
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Icon(
+                    imageVector = Icons.Outlined.ArrowDropDown,
+                    contentDescription = "Open date picker",
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
@@ -362,122 +462,72 @@ private fun TaskCard(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            Row(
-                modifier = Modifier.clickable { showEditAssignDialog = true },
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier.weight(1f)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.AccountCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { assignExpanded = true },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AccountCircle,
+                        contentDescription = "Change assigned user",
+                        modifier = Modifier.size(16.dp)
+                    )
 
-                Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
-                Text(
-                    text = task.assignTo,
-                    fontSize = 13.sp
-                )
+                    Text(
+                        text = task.assignTo,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowDropDown,
+                        contentDescription = "Open assigned user dropdown",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = assignExpanded,
+                    onDismissRequest = { assignExpanded = false }
+                ) {
+                    assignedUserOptions.forEach { fullName ->
+                        DropdownMenuItem(
+                            text = { Text(fullName) },
+                            onClick = {
+                                onQuickUpdateTask(task.copy(assignTo = fullName))
+                                assignExpanded = false
+                            }
+                        )
+                    }
+                }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null
-            )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
         ) {
-            Button(
-                onClick = onDeleteClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE58C8C),
-                    contentColor = Color.Black
-                ),
-                shape = RoundedCornerShape(12.dp)
+            IconButton(
+                onClick = onDeleteClick
             ) {
-                Text(
-                    text = "Delete",
-                    fontWeight = FontWeight.SemiBold
+                Icon(
+                    imageVector = Icons.Outlined.DeleteOutline,
+                    contentDescription = "Delete task",
+                    tint = Color(0xFFB85C5C)
                 )
             }
         }
-    }
-
-    if (showEditDateDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditDateDialog = false },
-            title = { Text("Edit date") },
-            text = {
-                OutlinedTextField(
-                    value = editedDate,
-                    onValueChange = { editedDate = it },
-                    label = { Text("Date") },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onQuickUpdateTask(task.copy(date = editedDate))
-                        showEditDateDialog = false
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        editedDate = task.date
-                        showEditDateDialog = false
-                    }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    if (showEditAssignDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditAssignDialog = false },
-            title = { Text("Edit assigned person") },
-            text = {
-                OutlinedTextField(
-                    value = editedAssignTo,
-                    onValueChange = { editedAssignTo = it },
-                    label = { Text("Assigned to") },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onQuickUpdateTask(task.copy(assignTo = editedAssignTo))
-                        showEditAssignDialog = false
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        editedAssignTo = task.assignTo
-                        showEditAssignDialog = false
-                    }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 
@@ -511,4 +561,16 @@ private fun taskStatusLabel(status: TaskStatus): String {
         TaskStatus.IN_PROGRESS -> "In Progress"
         TaskStatus.COMPLETED -> "Completed"
     }
+}
+
+private fun statusSortOrder(status: TaskStatus): Int {
+    return when (status) {
+        TaskStatus.PENDING -> 0
+        TaskStatus.IN_PROGRESS -> 1
+        TaskStatus.COMPLETED -> 2
+    }
+}
+
+private fun dateToSortableNumber(date: String): Int {
+    return date.replace("-", "").toIntOrNull() ?: 0
 }

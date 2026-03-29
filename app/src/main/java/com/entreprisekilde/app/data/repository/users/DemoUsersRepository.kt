@@ -5,6 +5,8 @@ import com.entreprisekilde.app.data.model.users.EmployeeUser
 class DemoUsersRepository : UserRepository {
 
     private var nextId = 7
+    private var currentLoggedInUser: EmployeeUser? = null
+    private var authObserver: ((String?) -> Unit)? = null
 
     private val users = mutableListOf(
         EmployeeUser(
@@ -74,9 +76,36 @@ class DemoUsersRepository : UserRepository {
     }
 
     override suspend fun login(username: String, password: String): EmployeeUser? {
-        return users.find {
+        val matchedUser = users.find {
             it.username == username && it.password == password
         }
+
+        currentLoggedInUser = matchedUser
+        authObserver?.invoke(matchedUser?.id)
+
+        return matchedUser
+    }
+
+    override suspend fun getUserById(userId: String): EmployeeUser? {
+        return users.firstOrNull { it.id == userId }
+    }
+
+    override fun getCurrentAuthUserId(): String? {
+        return currentLoggedInUser?.id
+    }
+
+    override fun observeAuthState(onAuthUserChanged: (String?) -> Unit) {
+        authObserver = onAuthUserChanged
+        onAuthUserChanged(currentLoggedInUser?.id)
+    }
+
+    override fun stopObservingAuthState() {
+        authObserver = null
+    }
+
+    override fun logout() {
+        currentLoggedInUser = null
+        authObserver?.invoke(null)
     }
 
     override suspend fun addUser(

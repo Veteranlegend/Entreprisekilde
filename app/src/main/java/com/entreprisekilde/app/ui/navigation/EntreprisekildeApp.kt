@@ -1,17 +1,20 @@
 package com.entreprisekilde.app.ui.navigation
-import com.entreprisekilde.app.data.repository.timesheet.DemoTimesheetRepository
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModel
-import com.entreprisekilde.app.data.repository.users.FirebaseUsersRepository
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.entreprisekilde.app.data.repository.users.DemoUsersRepository
+import com.entreprisekilde.app.data.model.notifications.NotificationType
+import com.entreprisekilde.app.data.repository.messages.FirebaseMessagesRepository
+import com.entreprisekilde.app.data.repository.notifications.DemoNotificationRepository
+import com.entreprisekilde.app.data.repository.tasks.FirebaseTasksRepository
+import com.entreprisekilde.app.data.repository.timesheet.DemoTimesheetRepository
+import com.entreprisekilde.app.data.repository.users.FirebaseUsersRepository
 import com.entreprisekilde.app.ui.admin.calendar.CalendarDayScreen
 import com.entreprisekilde.app.ui.admin.calendar.CalendarScreen
-import com.entreprisekilde.app.data.repository.tasks.DemoTasksRepository
 import com.entreprisekilde.app.ui.admin.dashboard.AdminDashboardScreen
 import com.entreprisekilde.app.ui.admin.messages.ChatScreen
 import com.entreprisekilde.app.ui.admin.messages.MessagesScreen
@@ -30,10 +33,8 @@ import com.entreprisekilde.app.ui.admin.users.UserDetailsScreen
 import com.entreprisekilde.app.ui.admin.users.UsersViewModel
 import com.entreprisekilde.app.ui.auth.login.LoginScreen
 import com.entreprisekilde.app.ui.notifications.NotificationScreen
-import com.entreprisekilde.app.data.model.notifications.NotificationType
 import com.entreprisekilde.app.ui.notifications.NotificationViewModel
-import com.entreprisekilde.app.data.repository.messages.DemoMessagesRepository
-import com.entreprisekilde.app.data.repository.notifications.DemoNotificationRepository
+
 @Composable
 fun EntreprisekildeApp() {
 
@@ -43,13 +44,11 @@ fun EntreprisekildeApp() {
     val profileImageUri = remember { mutableStateOf<String?>(null) }
     val selectedTaskId = remember { mutableStateOf<String?>(null) }
 
-
     val userRepository = remember { FirebaseUsersRepository() }
-    val tasksRepository = remember { DemoTasksRepository() }
-    val messagesRepository = remember { DemoMessagesRepository() }
+    val tasksRepository = remember { FirebaseTasksRepository() }
+    val messagesRepository = remember { FirebaseMessagesRepository() }
     val timesheetRepository = remember { DemoTimesheetRepository() }
     val notificationRepository = remember { DemoNotificationRepository() }
-
 
     val usersViewModel: UsersViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -83,8 +82,6 @@ fun EntreprisekildeApp() {
         }
     )
 
-
-
     val notificationViewModel: NotificationViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -95,12 +92,18 @@ fun EntreprisekildeApp() {
 
     val users = usersViewModel.users
     val tasks = tasksViewModel.tasks
+    val taskAssignedUserOptions = users
+        .map { "${it.firstName} ${it.lastName}".trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+
     val notifications = notificationViewModel.notifications
     val unreadNotificationCount = notificationViewModel.unreadCount()
 
     val selectedTask = tasks.firstOrNull { it.id == selectedTaskId.value }
     val selectedUser = usersViewModel.selectedUser
     val loggedInUser = usersViewModel.loggedInUser
+    val isCheckingAuth = usersViewModel.isCheckingAuth
 
     val profileFirstName = loggedInUser?.firstName ?: "Admin"
     val profileLastName = loggedInUser?.lastName ?: ""
@@ -109,9 +112,17 @@ fun EntreprisekildeApp() {
 
     val timesheetEmployees = timesheetViewModel.getEmployees()
 
-    LaunchedEffect(loggedInUser) {
-        if (loggedInUser != null && currentScreen.value == Screen.Login) {
-            currentScreen.value = Screen.Dashboard
+    LaunchedEffect(Unit) {
+        usersViewModel.startAuthObserver()
+    }
+
+    LaunchedEffect(loggedInUser, isCheckingAuth) {
+        if (!isCheckingAuth) {
+            currentScreen.value = if (loggedInUser != null) {
+                Screen.Dashboard
+            } else {
+                Screen.Login
+            }
         }
     }
 
@@ -193,6 +204,12 @@ fun EntreprisekildeApp() {
         Screen.Tasks -> {
             TasksScreen(
                 tasks = tasks,
+                assignedUserOptions = taskAssignedUserOptions,
+                isLoading = tasksViewModel.isLoading.value,
+                errorMessage = tasksViewModel.errorMessage.value,
+                onRetry = {
+                    tasksViewModel.retryLoadTasks()
+                },
                 onBack = goToDashboard,
                 onCreateTaskClick = goToCreateTask,
                 onDeleteTask = { taskId ->
@@ -229,10 +246,7 @@ fun EntreprisekildeApp() {
                         tasksViewModel.updateTask(updatedTask)
                         currentScreen.value = taskDetailsBackTarget.value
                     },
-                    assignedUserOptions = users
-                        .map { it.username }
-                        .filter { it.isNotBlank() }
-                        .distinct(),
+                    assignedUserOptions = taskAssignedUserOptions,
                     unreadNotificationCount = unreadNotificationCount,
                     onHomeClick = goToDashboard,
                     onMessagesClick = goToMessages,
@@ -258,6 +272,7 @@ fun EntreprisekildeApp() {
 
                     currentScreen.value = Screen.Tasks
                 },
+                assignedUserOptions = taskAssignedUserOptions,
                 onHomeClick = goToDashboard,
                 onMessagesClick = goToMessages,
                 onNotificationsClick = goToNotifications,
@@ -402,6 +417,7 @@ fun EntreprisekildeApp() {
                 onProfileClick = goToProfile
             )
         }
+
         Screen.Profile -> {
             ProfileScreen(
                 email = profileEmail,

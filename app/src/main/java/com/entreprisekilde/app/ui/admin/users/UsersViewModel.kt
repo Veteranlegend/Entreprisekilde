@@ -22,6 +22,9 @@ class UsersViewModel(
     var loggedInUser by mutableStateOf<EmployeeUser?>(null)
         private set
 
+    var isCheckingAuth by mutableStateOf(true)
+        private set
+
     var loginErrorMessage by mutableStateOf<String?>(null)
         private set
 
@@ -41,6 +44,22 @@ class UsersViewModel(
         loadUsers()
     }
 
+    fun startAuthObserver() {
+        isCheckingAuth = true
+
+        userRepository.observeAuthState { userId ->
+            if (userId == null) {
+                loggedInUser = null
+                isCheckingAuth = false
+            } else {
+                viewModelScope.launch {
+                    loggedInUser = userRepository.getUserById(userId)
+                    isCheckingAuth = false
+                }
+            }
+        }
+    }
+
     fun login(username: String, password: String) {
         viewModelScope.launch {
             val matchedUser = userRepository.login(username, password)
@@ -55,6 +74,7 @@ class UsersViewModel(
     }
 
     fun logout() {
+        userRepository.logout()
         loggedInUser = null
         loginErrorMessage = null
     }
@@ -141,5 +161,10 @@ class UsersViewModel(
     private suspend fun refreshUsers() {
         users.clear()
         users.addAll(userRepository.getUsers())
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        userRepository.stopObservingAuthState()
     }
 }
