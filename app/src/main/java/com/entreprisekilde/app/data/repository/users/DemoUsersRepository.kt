@@ -8,7 +8,7 @@ class DemoUsersRepository : UserRepository {
 
     private val users = mutableListOf(
         EmployeeUser(
-            id = 1,
+            id = "1",
             firstName = "Rasmus",
             lastName = "Jensen",
             email = "rasmus.jensen@entreprisekilde.dk",
@@ -18,7 +18,7 @@ class DemoUsersRepository : UserRepository {
             role = "employee"
         ),
         EmployeeUser(
-            id = 2,
+            id = "2",
             firstName = "Tomas",
             lastName = "Larsen",
             email = "tomas.larsen@entreprisekilde.dk",
@@ -28,7 +28,7 @@ class DemoUsersRepository : UserRepository {
             role = "admin"
         ),
         EmployeeUser(
-            id = 3,
+            id = "3",
             firstName = "Peter",
             lastName = "Hansen",
             email = "peter.hansen@entreprisekilde.dk",
@@ -38,7 +38,7 @@ class DemoUsersRepository : UserRepository {
             role = "employee"
         ),
         EmployeeUser(
-            id = 4,
+            id = "4",
             firstName = "John",
             lastName = "Miller",
             email = "john.miller@entreprisekilde.dk",
@@ -48,7 +48,7 @@ class DemoUsersRepository : UserRepository {
             role = "employee"
         ),
         EmployeeUser(
-            id = 5,
+            id = "5",
             firstName = "Ahmad",
             lastName = "El Haj",
             email = "ahmad.elhaj@entreprisekilde.dk",
@@ -58,7 +58,7 @@ class DemoUsersRepository : UserRepository {
             role = "employee"
         ),
         EmployeeUser(
-            id = 6,
+            id = "6",
             firstName = "Lars",
             lastName = "Nielsen",
             email = "lars.nielsen@entreprisekilde.dk",
@@ -86,9 +86,9 @@ class DemoUsersRepository : UserRepository {
         phoneNumber: String,
         username: String,
         password: String
-    ) {
+    ): Result<Unit> {
         val newUser = EmployeeUser(
-            id = nextId++,
+            id = nextId.toString(),
             firstName = firstName,
             lastName = lastName,
             email = email,
@@ -98,13 +98,20 @@ class DemoUsersRepository : UserRepository {
             role = "employee"
         )
 
+        nextId++
         users.add(newUser)
+
+        return Result.success(Unit)
     }
 
-    override suspend fun updateUser(updatedUser: EmployeeUser) {
+    override suspend fun updateUser(updatedUser: EmployeeUser): Result<Unit> {
         val index = users.indexOfFirst { it.id == updatedUser.id }
-        if (index != -1) {
+
+        return if (index != -1) {
             users[index] = updatedUser
+            Result.success(Unit)
+        } else {
+            Result.failure(Exception("User not found"))
         }
     }
 }

@@ -15,7 +15,7 @@ interface UserRepository {
         phoneNumber: String,
         username: String,
         password: String
-    )
+    ): Result<Unit>
 
-    suspend fun updateUser(updatedUser: EmployeeUser)
+    suspend fun updateUser(updatedUser: EmployeeUser): Result<Unit>
 }

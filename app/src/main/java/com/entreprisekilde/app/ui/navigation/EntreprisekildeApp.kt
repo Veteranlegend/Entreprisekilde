@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModel
+import com.entreprisekilde.app.data.repository.users.FirebaseUsersRepository
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.entreprisekilde.app.data.repository.users.DemoUsersRepository
@@ -43,7 +44,7 @@ fun EntreprisekildeApp() {
     val selectedTaskId = remember { mutableStateOf<String?>(null) }
 
 
-    val userRepository = remember { DemoUsersRepository() }
+    val userRepository = remember { FirebaseUsersRepository() }
     val tasksRepository = remember { DemoTasksRepository() }
     val messagesRepository = remember { DemoMessagesRepository() }
     val timesheetRepository = remember { DemoTimesheetRepository() }
@@ -376,7 +377,10 @@ fun EntreprisekildeApp() {
 
         Screen.CreateUser -> {
             CreateUserScreen(
-                onBack = goToUsers,
+                onBack = {
+                    usersViewModel.clearCreateUserMessages()
+                    goToUsers()
+                },
                 onCreateUser = { firstName, lastName, email, phoneNumber, username, password ->
                     usersViewModel.addUser(
                         firstName = firstName,
@@ -386,7 +390,11 @@ fun EntreprisekildeApp() {
                         username = username,
                         password = password
                     )
-                    currentScreen.value = Screen.Employees
+                },
+                successMessage = usersViewModel.createUserMessage,
+                backendErrorMessage = usersViewModel.createUserErrorMessage,
+                onClearMessages = {
+                    usersViewModel.clearCreateUserMessages()
                 },
                 onHomeClick = goToDashboard,
                 onMessagesClick = goToMessages,
@@ -394,7 +402,6 @@ fun EntreprisekildeApp() {
                 onProfileClick = goToProfile
             )
         }
-
         Screen.Profile -> {
             ProfileScreen(
                 email = profileEmail,

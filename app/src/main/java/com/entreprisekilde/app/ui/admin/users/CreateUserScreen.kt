@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +55,9 @@ import androidx.compose.ui.unit.sp
 fun CreateUserScreen(
     onBack: () -> Unit = {},
     onCreateUser: (String, String, String, String, String, String) -> Unit = { _, _, _, _, _, _ -> },
+    successMessage: String? = null,
+    backendErrorMessage: String? = null,
+    onClearMessages: () -> Unit = {},
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
@@ -66,7 +70,20 @@ fun CreateUserScreen(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
+    var localErrorMessage by remember { mutableStateOf("") }
+
+    LaunchedEffect(successMessage) {
+        if (!successMessage.isNullOrBlank()) {
+            firstName = ""
+            lastName = ""
+            phoneNumber = ""
+            email = ""
+            username = ""
+            password = ""
+            passwordVisible = false
+            localErrorMessage = ""
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -82,7 +99,10 @@ fun CreateUserScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = onBack,
+                onClick = {
+                    onClearMessages()
+                    onBack()
+                },
                 modifier = Modifier.size(28.dp)
             ) {
                 Icon(
@@ -128,45 +148,81 @@ fun CreateUserScreen(
             FancyInputField(
                 label = "First Name",
                 value = firstName,
-                onValueChange = { firstName = it }
+                onValueChange = {
+                    firstName = it
+                    localErrorMessage = ""
+                }
             )
 
             FancyInputField(
                 label = "Last Name",
                 value = lastName,
-                onValueChange = { lastName = it }
+                onValueChange = {
+                    lastName = it
+                    localErrorMessage = ""
+                }
             )
 
             FancyInputField(
                 label = "Phone Number",
                 value = phoneNumber,
-                onValueChange = { phoneNumber = it }
+                onValueChange = {
+                    phoneNumber = it
+                    localErrorMessage = ""
+                }
             )
 
             FancyInputField(
                 label = "Email",
                 value = email,
-                onValueChange = { email = it }
+                onValueChange = {
+                    email = it
+                    localErrorMessage = ""
+                }
             )
 
             FancyInputField(
                 label = "Username",
                 value = username,
-                onValueChange = { username = it }
+                onValueChange = {
+                    username = it
+                    localErrorMessage = ""
+                }
             )
 
             FancyPasswordField(
                 label = "Password",
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = {
+                    password = it
+                    localErrorMessage = ""
+                },
                 passwordVisible = passwordVisible,
                 onToggleVisibility = { passwordVisible = !passwordVisible }
             )
 
-            if (errorMessage.isNotBlank()) {
+            if (localErrorMessage.isNotBlank()) {
                 Text(
-                    text = errorMessage,
+                    text = localErrorMessage,
                     color = Color(0xFFD32F2F),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            if (!backendErrorMessage.isNullOrBlank()) {
+                Text(
+                    text = backendErrorMessage,
+                    color = Color(0xFFD32F2F),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            if (!successMessage.isNullOrBlank()) {
+                Text(
+                    text = successMessage,
+                    color = Color(0xFF2E7D32),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -176,6 +232,8 @@ fun CreateUserScreen(
 
             Button(
                 onClick = {
+                    onClearMessages()
+
                     val cleanFirstName = firstName.trim()
                     val cleanLastName = lastName.trim()
                     val cleanPhoneNumber = phoneNumber.trim()
@@ -191,19 +249,30 @@ fun CreateUserScreen(
                         cleanUsername.isBlank() ||
                         cleanPassword.isBlank()
                     ) {
-                        errorMessage = "Please fill in all fields."
-                    } else {
-                        errorMessage = ""
-
-                        onCreateUser(
-                            cleanFirstName,
-                            cleanLastName,
-                            cleanEmail,
-                            cleanPhoneNumber,
-                            cleanUsername,
-                            cleanPassword
-                        )
+                        localErrorMessage = "Please fill in all fields."
+                        return@Button
                     }
+
+                    if (!cleanEmail.contains("@") || !cleanEmail.contains(".")) {
+                        localErrorMessage = "Please enter a valid email address."
+                        return@Button
+                    }
+
+                    if (cleanPassword.length < 6) {
+                        localErrorMessage = "Password must be at least 6 characters."
+                        return@Button
+                    }
+
+                    localErrorMessage = ""
+
+                    onCreateUser(
+                        cleanFirstName,
+                        cleanLastName,
+                        cleanEmail,
+                        cleanPhoneNumber,
+                        cleanUsername,
+                        cleanPassword
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -235,25 +304,37 @@ fun CreateUserScreen(
                 label = "Home",
                 icon = Icons.Outlined.Home,
                 color = Color.Black,
-                onClick = onHomeClick
+                onClick = {
+                    onClearMessages()
+                    onHomeClick()
+                }
             )
             CreateUserBottomNavItem(
                 label = "Message",
                 icon = Icons.Outlined.ChatBubbleOutline,
                 color = Color(0xFF9F98AA),
-                onClick = onMessagesClick
+                onClick = {
+                    onClearMessages()
+                    onMessagesClick()
+                }
             )
             CreateUserBottomNavItem(
                 label = "Notification",
                 icon = Icons.Outlined.Inventory2,
                 color = Color(0xFF9F98AA),
-                onClick = onNotificationsClick
+                onClick = {
+                    onClearMessages()
+                    onNotificationsClick()
+                }
             )
             CreateUserBottomNavItem(
                 label = "Profile",
                 icon = Icons.Outlined.PersonOutline,
                 color = Color(0xFF9F98AA),
-                onClick = onProfileClick
+                onClick = {
+                    onClearMessages()
+                    onProfileClick()
+                }
             )
         }
     }

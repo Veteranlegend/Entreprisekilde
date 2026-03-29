@@ -25,6 +25,18 @@ class UsersViewModel(
     var loginErrorMessage by mutableStateOf<String?>(null)
         private set
 
+    var createUserMessage by mutableStateOf<String?>(null)
+        private set
+
+    var createUserErrorMessage by mutableStateOf<String?>(null)
+        private set
+
+    var updateUserMessage by mutableStateOf<String?>(null)
+        private set
+
+    var updateUserErrorMessage by mutableStateOf<String?>(null)
+        private set
+
     init {
         loadUsers()
     }
@@ -55,6 +67,16 @@ class UsersViewModel(
         selectedUser = null
     }
 
+    fun clearCreateUserMessages() {
+        createUserMessage = null
+        createUserErrorMessage = null
+    }
+
+    fun clearUpdateUserMessages() {
+        updateUserMessage = null
+        updateUserErrorMessage = null
+    }
+
     fun addUser(
         firstName: String,
         lastName: String,
@@ -64,27 +86,48 @@ class UsersViewModel(
         password: String
     ) {
         viewModelScope.launch {
-            userRepository.addUser(
-                firstName,
-                lastName,
-                email,
-                phoneNumber,
-                username,
-                password
+            clearCreateUserMessages()
+
+            val result = userRepository.addUser(
+                firstName = firstName,
+                lastName = lastName,
+                email = email,
+                phoneNumber = phoneNumber,
+                username = username,
+                password = password
             )
-            refreshUsers()
+
+            result
+                .onSuccess {
+                    refreshUsers()
+                    createUserMessage = "User created successfully."
+                }
+                .onFailure { exception ->
+                    createUserErrorMessage = exception.message ?: "Failed to create user."
+                }
         }
     }
 
     fun updateUser(updatedUser: EmployeeUser) {
         viewModelScope.launch {
-            userRepository.updateUser(updatedUser)
-            refreshUsers()
-            selectedUser = updatedUser
+            clearUpdateUserMessages()
 
-            if (loggedInUser?.id == updatedUser.id) {
-                loggedInUser = updatedUser
-            }
+            val result = userRepository.updateUser(updatedUser)
+
+            result
+                .onSuccess {
+                    refreshUsers()
+                    selectedUser = updatedUser
+
+                    if (loggedInUser?.id == updatedUser.id) {
+                        loggedInUser = updatedUser
+                    }
+
+                    updateUserMessage = "User updated successfully."
+                }
+                .onFailure { exception ->
+                    updateUserErrorMessage = exception.message ?: "Failed to update user."
+                }
         }
     }
 
