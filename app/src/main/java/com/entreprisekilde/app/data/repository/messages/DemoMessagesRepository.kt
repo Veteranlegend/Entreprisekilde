@@ -19,20 +19,33 @@ class DemoMessagesRepository : MessagesRepository {
         return chatMessages[threadId]?.toList() ?: emptyList()
     }
 
+    override fun startMessagesListener(
+        threadId: Int,
+        onUpdate: (List<ChatMessage>) -> Unit,
+        onError: (String) -> Unit
+    ): () -> Unit {
+        onUpdate(chatMessages[threadId]?.toList() ?: emptyList())
+        return {}
+    }
+
     override suspend fun deleteThread(threadId: Int) {
         messageThreads.removeAll { it.id == threadId }
         chatMessages.remove(threadId)
     }
 
-    override suspend fun sendMessage(threadId: Int, text: String) {
+    override suspend fun sendMessage(
+        threadId: Int,
+        senderId: String,
+        text: String
+    ) {
         val messages = chatMessages.getOrPut(threadId) { mutableListOf() }
 
         val newMessageId = (chatMessages.values.flatten().maxOfOrNull { it.id } ?: 0) + 1
         val newMessage = ChatMessage(
             id = newMessageId,
             threadId = threadId,
+            senderId = senderId,
             text = text,
-            isFromMe = true,
             time = currentTime()
         )
 
@@ -50,6 +63,31 @@ class DemoMessagesRepository : MessagesRepository {
 
     override suspend fun findThreadById(threadId: Int): MessageThread? {
         return messageThreads.firstOrNull { it.id == threadId }
+    }
+
+    override suspend fun createOrGetThread(
+        recipientId: String,
+        recipientName: String
+    ): MessageThread {
+        val existingThread = messageThreads.firstOrNull { it.recipientId == recipientId }
+        if (existingThread != null) {
+            return existingThread
+        }
+
+        val newThreadId = (messageThreads.maxOfOrNull { it.id } ?: 0) + 1
+
+        val newThread = MessageThread(
+            id = newThreadId,
+            recipientId = recipientId,
+            recipientName = recipientName,
+            lastMessage = "",
+            unreadCount = 0
+        )
+
+        messageThreads.add(newThread)
+        chatMessages[newThreadId] = mutableListOf()
+
+        return newThread
     }
 
     private fun currentTime(): String {

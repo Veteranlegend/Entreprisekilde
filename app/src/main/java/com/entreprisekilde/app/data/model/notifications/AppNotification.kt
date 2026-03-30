@@ -1,13 +1,14 @@
-
 package com.entreprisekilde.app.data.model.notifications
+
 data class AppNotification(
-    val id: Int,
-    val title: String,
-    val message: String,
-    val type: NotificationType,
-    val createdAt: String,
+    val id: String = "",
+    val title: String = "",
+    val message: String = "",
+    val type: NotificationType = NotificationType.MESSAGE,
+    val createdAt: Long = 0L,
     val isRead: Boolean = false,
-    val relatedThreadId: Int? = null
+    val relatedThreadId: Int? = null,
+    val userId: String = ""
 )
 
 enum class NotificationType {

@@ -16,6 +16,9 @@ class MessagesViewModel(
     val messageThreads = mutableStateListOf<MessageThread>()
     val currentMessages = mutableStateListOf<ChatMessage>()
     val selectedThread = mutableStateOf<MessageThread?>(null)
+    val errorMessage = mutableStateOf<String?>(null)
+
+    private var removeMessagesListener: (() -> Unit)? = null
 
     init {
         loadThreads()
@@ -23,7 +26,7 @@ class MessagesViewModel(
 
     fun selectThread(thread: MessageThread) {
         selectedThread.value = thread
-        loadMessages(thread.id)
+        startListeningToMessages(thread.id)
     }
 
     fun selectThreadById(threadId: Int): Boolean {
@@ -32,50 +35,107 @@ class MessagesViewModel(
         return true
     }
 
+    fun createOrGetThread(
+        recipientId: String,
+        recipientName: String,
+        onReady: (MessageThread) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val thread = repository.createOrGetThread(
+                    recipientId = recipientId,
+                    recipientName = recipientName
+                )
+                refreshThreads()
+                selectedThread.value = thread
+                startListeningToMessages(thread.id)
+                onReady(thread)
+            } catch (e: Exception) {
+                errorMessage.value = e.message ?: "Failed to create chat."
+            }
+        }
+    }
+
     fun deleteThread(thread: MessageThread) {
         viewModelScope.launch {
-            repository.deleteThread(thread.id)
-            refreshThreads()
+            try {
+                repository.deleteThread(thread.id)
+                refreshThreads()
 
-            if (selectedThread.value?.id == thread.id) {
-                selectedThread.value = null
-                currentMessages.clear()
+                if (selectedThread.value?.id == thread.id) {
+                    stopListeningToMessages()
+                    selectedThread.value = null
+                    currentMessages.clear()
+                }
+            } catch (e: Exception) {
+                errorMessage.value = e.message ?: "Failed to delete chat."
             }
         }
     }
 
     fun getMessagesForSelectedThread() = currentMessages
 
-    fun sendMessage(message: String) {
+    fun sendMessage(
+        senderId: String,
+        message: String
+    ) {
         val thread = selectedThread.value ?: return
 
         viewModelScope.launch {
-            repository.sendMessage(thread.id, message)
-            refreshThreads()
+            try {
+                repository.sendMessage(
+                    threadId = thread.id,
+                    senderId = senderId,
+                    text = message
+                )
+                refreshThreads()
 
-            val updatedThread = repository.findThreadById(thread.id)
-            selectedThread.value = updatedThread
-
-            loadMessages(thread.id)
+                val updatedThread = repository.findThreadById(thread.id)
+                selectedThread.value = updatedThread
+            } catch (e: Exception) {
+                errorMessage.value = e.message ?: "Failed to send message."
+            }
         }
     }
 
     private fun loadThreads() {
         viewModelScope.launch {
-            messageThreads.clear()
-            messageThreads.addAll(repository.getThreads())
+            try {
+                messageThreads.clear()
+                messageThreads.addAll(repository.getThreads())
+            } catch (e: Exception) {
+                errorMessage.value = e.message ?: "Failed to load chats."
+            }
         }
     }
 
-    private fun loadMessages(threadId: Int) {
-        viewModelScope.launch {
-            currentMessages.clear()
-            currentMessages.addAll(repository.getMessages(threadId))
-        }
+    private fun startListeningToMessages(threadId: Int) {
+        stopListeningToMessages()
+
+        removeMessagesListener = repository.startMessagesListener(
+            threadId = threadId,
+            onUpdate = { messages ->
+                currentMessages.clear()
+                currentMessages.addAll(messages)
+            },
+            onError = { message ->
+                errorMessage.value = message
+            }
+        )
+    }
+
+    private fun stopListeningToMessages() {
+        removeMessagesListener?.invoke()
+        removeMessagesListener = null
     }
 
     private suspend fun refreshThreads() {
         messageThreads.clear()
         messageThreads.addAll(repository.getThreads())
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopListeningToMessages()
     }
 }

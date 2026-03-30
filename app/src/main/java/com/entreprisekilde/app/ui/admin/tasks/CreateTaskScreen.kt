@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AddTask
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -36,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
+import com.entreprisekilde.app.data.model.users.EmployeeUser
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
 import java.util.Calendar
@@ -59,7 +62,7 @@ fun CreateTaskScreen(
     unreadNotificationCount: Int = 0,
     onBack: () -> Unit = {},
     onCreateTask: (TaskData) -> Unit = {},
-    assignedUserOptions: List<String> = emptyList(),
+    assignedUserOptions: List<EmployeeUser> = emptyList(),
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
@@ -72,8 +75,10 @@ fun CreateTaskScreen(
     var address by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var assignTo by remember { mutableStateOf("") }
+    var assignedUserId by remember { mutableStateOf("") }
     var taskDetails by remember { mutableStateOf("") }
     var assignToExpanded by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
     val headerColor = Color(0xFFE0A673)
     val buttonColor = Color(0xFFCFE0D0)
@@ -99,6 +104,29 @@ fun CreateTaskScreen(
             } catch (_: Exception) {
             }
         }
+    }
+
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showSuccessDialog = false
+            },
+            title = {
+                Text("Task created")
+            },
+            text = {
+                Text("The task was created successfully.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSuccessDialog = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     Column(
@@ -189,7 +217,8 @@ fun CreateTaskScreen(
                 onExpand = { assignToExpanded = true },
                 onDismiss = { assignToExpanded = false },
                 onSelect = { selectedUser ->
-                    assignTo = selectedUser
+                    assignTo = selectedUser.fullName
+                    assignedUserId = selectedUser.id
                     assignToExpanded = false
                 }
             )
@@ -213,11 +242,22 @@ fun CreateTaskScreen(
                             phoneNumber = phoneNumber.trim(),
                             address = address.trim(),
                             date = date,
-                            assignTo = assignTo,
+                            assignTo = assignTo.trim(),
+                            assignedUserId = assignedUserId.trim(),
                             taskDetails = taskDetails.trim(),
                             status = TaskStatus.PENDING
                         )
                     )
+
+                    customer = ""
+                    phoneNumber = ""
+                    address = ""
+                    date = ""
+                    assignTo = ""
+                    assignedUserId = ""
+                    taskDetails = ""
+                    assignToExpanded = false
+                    showSuccessDialog = true
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -344,11 +384,11 @@ private fun DateSelectorField(
 private fun AssignToSelectorField(
     label: String,
     value: String,
-    options: List<String>,
+    options: List<EmployeeUser>,
     expanded: Boolean,
     onExpand: () -> Unit,
     onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
+    onSelect: (EmployeeUser) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -399,10 +439,10 @@ private fun AssignToSelectorField(
                 expanded = expanded,
                 onDismissRequest = onDismiss
             ) {
-                options.forEach { userName ->
+                options.forEach { user ->
                     DropdownMenuItem(
-                        text = { Text(userName) },
-                        onClick = { onSelect(userName) }
+                        text = { Text(user.fullName.ifBlank { user.username }) },
+                        onClick = { onSelect(user) }
                     )
                 }
             }

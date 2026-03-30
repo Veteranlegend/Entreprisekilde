@@ -9,6 +9,7 @@ data class TaskData(
     val address: String,
     val date: String,
     val assignTo: String,
+    val assignedUserId: String = "",
     val taskDetails: String,
     val status: TaskStatus = TaskStatus.PENDING
 )

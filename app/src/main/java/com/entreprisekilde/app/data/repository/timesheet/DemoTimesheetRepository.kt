@@ -50,6 +50,15 @@ class DemoTimesheetRepository : TimesheetRepository {
         }
     }
 
+    override suspend fun undoEntryStatus(entryId: String) {
+        val index = timesheetEntries.indexOfFirst { it.id == entryId }
+        if (index != -1) {
+            timesheetEntries[index] = timesheetEntries[index].copy(
+                approvalStatus = ShiftApprovalStatus.PENDING
+            )
+        }
+    }
+
     override suspend fun deleteEntry(entryId: String) {
         timesheetEntries.removeAll { it.id == entryId }
     }

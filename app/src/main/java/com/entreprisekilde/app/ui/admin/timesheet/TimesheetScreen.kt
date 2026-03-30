@@ -1,6 +1,5 @@
 package com.entreprisekilde.app.ui.admin.timesheet
-import com.entreprisekilde.app.data.model.timesheet.TimesheetEntry
-import com.entreprisekilde.app.data.model.timesheet.ShiftApprovalStatus
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +28,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ModeEdit
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.entreprisekilde.app.data.model.timesheet.ShiftApprovalStatus
+import com.entreprisekilde.app.data.model.timesheet.TimesheetEntry
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
 import java.time.Duration
@@ -65,6 +68,7 @@ fun TimesheetScreen(
     onBack: () -> Unit = {},
     onApproveEntry: (String) -> Unit = {},
     onDeclineEntry: (String) -> Unit = {},
+    onUndoEntryStatus: (String) -> Unit = {},
     onDeleteEntry: (String) -> Unit = {},
     onAssignShift: (TimesheetEntry) -> Unit = {},
     onHomeClick: () -> Unit = {},
@@ -75,7 +79,10 @@ fun TimesheetScreen(
     var searchText by remember { mutableStateOf("") }
     var showAssignDialog by remember { mutableStateOf(false) }
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
+    var undoTargetId by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showUndoDialog by remember { mutableStateOf(false) }
+    var expandedUpcomingEntryId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val filteredEntries = timesheets.filter {
         searchText.isBlank() ||
@@ -87,12 +94,12 @@ fun TimesheetScreen(
 
     val sortedEntries = filteredEntries.sortedByDescending { parseTimesheetDate(it.date) }
 
-    val pendingEntries = sortedEntries.filter {
-        classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.PENDING
+    val upcomingEntries = sortedEntries.filter {
+        classifyShift(it.date) == "future" && it.approvalStatus == ShiftApprovalStatus.PENDING
     }
 
-    val upcomingEntries = sortedEntries.filter {
-        classifyShift(it.date) == "future"
+    val pendingEntries = sortedEntries.filter {
+        classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.PENDING
     }
 
     val approvedEntries = sortedEntries.filter {
@@ -100,7 +107,7 @@ fun TimesheetScreen(
     }
 
     val declinedEntries = sortedEntries.filter {
-        classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.DECLINED
+        it.approvalStatus == ShiftApprovalStatus.DECLINED
     }
 
     val approvedMinutesTotal = approvedEntries.sumOf {
@@ -251,16 +258,30 @@ fun TimesheetScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                if (pendingEntries.isNotEmpty()) {
-                    item { SectionTitle("Pending review") }
+                if (upcomingEntries.isNotEmpty()) {
+                    item { SectionTitle("Upcoming shifts") }
 
-                    items(pendingEntries, key = { it.id }) { entry ->
+                    items(upcomingEntries, key = { it.id }) { entry ->
+                        val isExpanded = expandedUpcomingEntryId == entry.id
+
                         TimesheetCard(
                             entry = entry,
-                            showActions = true,
+                            showActions = isExpanded,
                             showDelete = true,
-                            onApprove = { onApproveEntry(entry.id) },
-                            onDecline = { onDeclineEntry(entry.id) },
+                            showUndo = false,
+                            expandable = true,
+                            onCardClick = {
+                                expandedUpcomingEntryId =
+                                    if (expandedUpcomingEntryId == entry.id) null else entry.id
+                            },
+                            onApprove = {
+                                onApproveEntry(entry.id)
+                                expandedUpcomingEntryId = null
+                            },
+                            onDecline = {
+                                onDeclineEntry(entry.id)
+                                expandedUpcomingEntryId = null
+                            },
                             onDelete = {
                                 deleteTargetId = entry.id
                                 showDeleteDialog = true
@@ -269,14 +290,18 @@ fun TimesheetScreen(
                     }
                 }
 
-                if (upcomingEntries.isNotEmpty()) {
-                    item { SectionTitle("Upcoming shifts") }
+                if (pendingEntries.isNotEmpty()) {
+                    item { SectionTitle("Pending review") }
 
-                    items(upcomingEntries, key = { it.id }) { entry ->
+                    items(pendingEntries, key = { it.id }) { entry ->
                         TimesheetCard(
                             entry = entry,
-                            showActions = false,
+                            showActions = true,
                             showDelete = true,
+                            showUndo = false,
+                            expandable = false,
+                            onApprove = { onApproveEntry(entry.id) },
+                            onDecline = { onDeclineEntry(entry.id) },
                             onDelete = {
                                 deleteTargetId = entry.id
                                 showDeleteDialog = true
@@ -292,7 +317,17 @@ fun TimesheetScreen(
                         TimesheetCard(
                             entry = entry,
                             showActions = false,
-                            showDelete = false
+                            showDelete = true,
+                            showUndo = true,
+                            expandable = false,
+                            onUndo = {
+                                undoTargetId = entry.id
+                                showUndoDialog = true
+                            },
+                            onDelete = {
+                                deleteTargetId = entry.id
+                                showDeleteDialog = true
+                            }
                         )
                     }
                 }
@@ -304,7 +339,17 @@ fun TimesheetScreen(
                         TimesheetCard(
                             entry = entry,
                             showActions = false,
-                            showDelete = false
+                            showDelete = true,
+                            showUndo = true,
+                            expandable = false,
+                            onUndo = {
+                                undoTargetId = entry.id
+                                showUndoDialog = true
+                            },
+                            onDelete = {
+                                deleteTargetId = entry.id
+                                showDeleteDialog = true
+                            }
                         )
                     }
                 }
@@ -402,6 +447,52 @@ fun TimesheetScreen(
             containerColor = Color.White
         )
     }
+
+    if (showUndoDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showUndoDialog = false
+                undoTargetId = null
+            },
+            title = {
+                Text(
+                    text = "Undo status?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("Are you sure you want to reset this shift back to pending?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        undoTargetId?.let { onUndoEntryStatus(it) }
+                        showUndoDialog = false
+                        undoTargetId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFD7E9FF),
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Undo")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showUndoDialog = false
+                        undoTargetId = null
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color.White
+        )
+    }
 }
 
 @Composable
@@ -422,8 +513,12 @@ private fun TimesheetCard(
     entry: TimesheetEntry,
     showActions: Boolean,
     showDelete: Boolean,
+    showUndo: Boolean,
+    expandable: Boolean,
+    onCardClick: () -> Unit = {},
     onApprove: () -> Unit = {},
     onDecline: () -> Unit = {},
+    onUndo: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
     val shiftType = classifyShift(entry.date)
@@ -435,21 +530,21 @@ private fun TimesheetCard(
     }
 
     val borderColor = when {
-        shiftType == "future" -> Color(0xFF8BB8F2)
+        shiftType == "future" && entry.approvalStatus == ShiftApprovalStatus.PENDING -> Color(0xFF8BB8F2)
         entry.approvalStatus == ShiftApprovalStatus.APPROVED -> Color(0xFF88C999)
         entry.approvalStatus == ShiftApprovalStatus.PENDING -> Color(0xFFE0C57A)
         else -> Color(0xFFE59A9A)
     }
 
     val statusChipColor = when {
-        shiftType == "future" -> Color(0xFFD7E9FF)
+        shiftType == "future" && entry.approvalStatus == ShiftApprovalStatus.PENDING -> Color(0xFFD7E9FF)
         entry.approvalStatus == ShiftApprovalStatus.APPROVED -> Color(0xFFDDF5E2)
         entry.approvalStatus == ShiftApprovalStatus.PENDING -> Color(0xFFF8EDC3)
         else -> Color(0xFFF7D7D7)
     }
 
     val statusText = when {
-        shiftType == "future" -> "Upcoming"
+        shiftType == "future" && entry.approvalStatus == ShiftApprovalStatus.PENDING -> "Upcoming"
         entry.approvalStatus == ShiftApprovalStatus.APPROVED -> "Approved"
         entry.approvalStatus == ShiftApprovalStatus.PENDING -> "Pending"
         else -> "Declined"
@@ -460,6 +555,7 @@ private fun TimesheetCard(
             .fillMaxWidth()
             .background(Color.White, RoundedCornerShape(20.dp))
             .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .clickable(enabled = expandable, onClick = onCardClick)
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -544,6 +640,15 @@ private fun TimesheetCard(
             }
         }
 
+        if (expandable && !showActions) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Tap to review this future shift",
+                fontSize = 12.sp,
+                color = Color(0xFF6F6F6F)
+            )
+        }
+
         if (showActions) {
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -586,6 +691,27 @@ private fun TimesheetCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Approve")
                 }
+            }
+        }
+
+        if (showUndo) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onUndo,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFD7E9FF),
+                    contentColor = Color.Black
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.RestartAlt,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Undo status")
             }
         }
     }
@@ -639,7 +765,7 @@ private fun AssignShiftDialog(
                 OutlinedTextField(
                     value = date,
                     onValueChange = { date = it },
-                    label = { Text("Date (dd/MM/yyyy)") },
+                    label = { Text("Date (dd/MM/yyyy or yyyy-MM-dd)") },
                     singleLine = true
                 )
                 OutlinedTextField(
@@ -667,7 +793,7 @@ private fun AssignShiftDialog(
 
 private fun classifyShift(date: String): String {
     return try {
-        val parsedDate = LocalDate.parse(date, DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+        val parsedDate = parseTimesheetDate(date)
         val today = LocalDate.now()
         when {
             parsedDate.isAfter(today) -> "future"
@@ -680,17 +806,24 @@ private fun classifyShift(date: String): String {
 }
 
 private fun parseTimesheetDate(date: String): LocalDate {
-    return try {
-        LocalDate.parse(date, DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-    } catch (_: Exception) {
-        LocalDate.MIN
+    val patterns = listOf("dd/MM/yyyy", "yyyy-MM-dd")
+
+    for (pattern in patterns) {
+        try {
+            return LocalDate.parse(date, DateTimeFormatter.ofPattern(pattern))
+        } catch (_: Exception) {
+        }
     }
+
+    return LocalDate.MIN
 }
 
 private fun prettyTimesheetDate(date: String): String {
     return try {
-        val parsed = LocalDate.parse(date, DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-        if (parsed.isEqual(LocalDate.now())) {
+        val parsed = parseTimesheetDate(date)
+        if (parsed == LocalDate.MIN) {
+            date
+        } else if (parsed.isEqual(LocalDate.now())) {
             "Today"
         } else {
             parsed.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
@@ -700,11 +833,23 @@ private fun prettyTimesheetDate(date: String): String {
     }
 }
 
+private fun parseFlexibleTime(value: String): LocalTime? {
+    val patterns = listOf("hh:mm a", "h:mm a", "HH:mm")
+
+    for (pattern in patterns) {
+        try {
+            return LocalTime.parse(value, DateTimeFormatter.ofPattern(pattern))
+        } catch (_: Exception) {
+        }
+    }
+
+    return null
+}
+
 private fun calculateDuration(from: String, to: String): String {
     return try {
-        val formatter = DateTimeFormatter.ofPattern("hh:mm a")
-        val start = LocalTime.parse(from, formatter)
-        val end = LocalTime.parse(to, formatter)
+        val start = parseFlexibleTime(from) ?: return "00:00"
+        val end = parseFlexibleTime(to) ?: return "00:00"
         val duration = Duration.between(start, end)
 
         val hours = duration.toHours()
@@ -718,9 +863,8 @@ private fun calculateDuration(from: String, to: String): String {
 
 private fun durationInMinutes(from: String, to: String): Int {
     return try {
-        val formatter = DateTimeFormatter.ofPattern("hh:mm a")
-        val start = LocalTime.parse(from, formatter)
-        val end = LocalTime.parse(to, formatter)
+        val start = parseFlexibleTime(from) ?: return 0
+        val end = parseFlexibleTime(to) ?: return 0
         Duration.between(start, end).toMinutes().toInt()
     } catch (_: Exception) {
         0

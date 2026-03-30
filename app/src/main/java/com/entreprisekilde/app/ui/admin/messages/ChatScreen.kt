@@ -1,22 +1,8 @@
 package com.entreprisekilde.app.ui.admin.messages
-import com.entreprisekilde.app.data.model.messages.ChatMessage
-import com.entreprisekilde.app.data.model.messages.MessageThread
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -30,11 +16,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,11 +24,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.entreprisekilde.app.data.model.messages.ChatMessage
+import com.entreprisekilde.app.data.model.messages.MessageThread
 
 @Composable
 fun ChatScreen(
     thread: MessageThread,
     messages: SnapshotStateList<ChatMessage>,
+    loggedInUserId: String,
     onBack: () -> Unit = {},
     onSendMessage: (String) -> Unit = {}
 ) {
@@ -59,6 +44,8 @@ fun ChatScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .imePadding()
     ) {
+
+        // 🔹 TOP BAR
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -87,33 +74,34 @@ fun ChatScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.size(10.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Text(
-                text = thread.name,
+                text = thread.recipientName,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
         }
 
-        Box(
+        // 🔹 MESSAGES LIST
+        LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            reverseLayout = false
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(messages) { message ->
-                    MessageBubble(message = message)
-                }
+            items(messages) { message ->
+                MessageBubble(
+                    message = message,
+                    isFromMe = message.senderId == loggedInUserId
+                )
             }
         }
 
+        // 🔹 INPUT FIELD
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -122,37 +110,33 @@ fun ChatScreen(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-            Box(
-                modifier = Modifier.weight(1f)
-            ) {
-                OutlinedTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    placeholder = { Text("Write a message...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        disabledContainerColor = Color.White
-                    )
-                )
-            }
 
-            Spacer(modifier = Modifier.size(8.dp))
+            OutlinedTextField(
+                value = messageText,
+                onValueChange = { messageText = it },
+                placeholder = { Text("Write a message...") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(18.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White
+                )
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
 
             Box(
                 modifier = Modifier
                     .size(52.dp)
                     .background(
-                        color = if (messageText.isNotBlank()) Color(0xFF6F92F6) else Color(0xFFD9DCE3),
+                        color = if (messageText.isNotBlank()) Color(0xFF6F92F6)
+                        else Color(0xFFD9DCE3),
                         shape = CircleShape
                     )
                     .clickable {
-                        val trimmedMessage = messageText.trim()
-
-                        if (trimmedMessage.isNotBlank()) {
-                            onSendMessage(trimmedMessage)
+                        val trimmed = messageText.trim()
+                        if (trimmed.isNotBlank()) {
+                            onSendMessage(trimmed)
                             messageText = ""
                         }
                     },
@@ -170,29 +154,32 @@ fun ChatScreen(
 
 @Composable
 private fun MessageBubble(
-    message: ChatMessage
+    message: ChatMessage,
+    isFromMe: Boolean
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (message.isFromMe) Alignment.End else Alignment.Start
+        horizontalAlignment = if (isFromMe) Alignment.End else Alignment.Start
     ) {
+
         Box(
             modifier = Modifier
                 .background(
-                    color = if (message.isFromMe) Color(0xFF7F9DF7) else Color(0xFFE8E8E8),
+                    color = if (isFromMe) Color(0xFF7F9DF7)
+                    else Color(0xFFE8E8E8),
                     shape = RoundedCornerShape(20.dp)
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
                 text = message.text,
-                color = if (message.isFromMe) Color.White else Color(0xFF333333),
+                color = if (isFromMe) Color.White else Color(0xFF333333),
                 fontSize = 16.sp
             )
         }
 
         if (message.time.isNotBlank()) {
-            Spacer(modifier = Modifier.size(4.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = message.time,
                 fontSize = 11.sp,

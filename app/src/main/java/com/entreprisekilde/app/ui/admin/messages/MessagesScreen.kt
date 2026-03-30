@@ -1,9 +1,11 @@
 package com.entreprisekilde.app.ui.admin.messages
+import androidx.compose.material.icons.filled.Add
 import com.entreprisekilde.app.data.model.messages.MessageThread
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +65,7 @@ fun MessagesScreen(
     threads: List<MessageThread>,
     unreadNotificationCount: Int = 0,
     onThreadClick: (MessageThread) -> Unit = {},
+    onNewChatClick: () -> Unit = {},
     onDeleteThread: (MessageThread) -> Unit = {},
     onBack: () -> Unit = {},
     onHomeClick: () -> Unit = {},
@@ -73,115 +76,127 @@ fun MessagesScreen(
 
     val filteredThreads = threads.filter {
         searchText.isBlank() ||
-                it.name.contains(searchText, ignoreCase = true) ||
+                it.recipientName.contains(searchText, ignoreCase = true) ||
                 it.lastMessage.contains(searchText, ignoreCase = true)
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFFE0A673))
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.Black
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = "Message",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Chat,
-                    contentDescription = "Messages",
-                    tint = Color(0xFF666666),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-        }
 
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = "Search"
-                    )
-                },
-                placeholder = { Text("Search") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent
-                )
-            )
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            // 🔹 TOP BAR (keep your existing code)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFE0A673))
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(
-                    items = filteredThreads,
-                    key = { it.id }
-                ) { thread ->
-                    SwipeToRevealThreadCard(
-                        thread = thread,
-                        onClick = { onThreadClick(thread) },
-                        onDeleteConfirmed = { onDeleteThread(thread) }
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.Black
                     )
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "Message",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
             }
+
+            // 🔹 CONTENT
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+
+                // 🔍 Search
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Search"
+                        )
+                    },
+                    placeholder = { Text("Search") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 🔹 THREAD LIST
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    items(filteredThreads, key = { it.id }) { thread ->
+                        SwipeToRevealThreadCard(
+                            thread = thread,
+                            onClick = { onThreadClick(thread) },
+                            onDeleteConfirmed = { onDeleteThread(thread) }
+                        )
+                    }
+                }
+            }
+
+            // 🔹 Bottom nav (keep yours)
+            AppBottomNavBar(
+                selectedItem = BottomNavDestination.MESSAGES,
+                unreadNotificationCount = unreadNotificationCount,
+                onHomeClick = onHomeClick,
+                onMessagesClick = {},
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick
+            )
         }
 
-        AppBottomNavBar(
-            selectedItem = BottomNavDestination.MESSAGES,
-            unreadNotificationCount = unreadNotificationCount,
-            onHomeClick = onHomeClick,
-            onMessagesClick = {},
-            onNotificationsClick = onNotificationsClick,
-            onProfileClick = onProfileClick
-        )
+        // 🔥 FLOATING BUTTON (THIS IS THE NEW PART)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(end = 20.dp, bottom = 100.dp)
+                .size(60.dp)
+                .background(Color(0xFF5FA8F5), CircleShape)
+                .clickable { onNewChatClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "New Chat",
+                tint = Color.White,
+                modifier = Modifier.size(30.dp)
+            )
+        }
     }
+
+
 }
 
 @Composable
@@ -209,7 +224,7 @@ private fun SwipeToRevealThreadCard(
                 )
             },
             text = {
-                Text("Are you sure you want to delete the chat with \"${thread.name}\"?")
+                Text("Are you sure you want to delete the chat with \"${thread.recipientName}\"?")
             },
             confirmButton = {
                 Button(
@@ -324,7 +339,7 @@ private fun SwipeToRevealThreadCard(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = thread.name,
+                    text = thread.recipientName,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black

@@ -28,6 +28,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ fun NotificationScreen(
     notifications: SnapshotStateList<AppNotification>,
     unreadCount: Int,
     onBack: () -> Unit = {},
+    onScreenOpened: () -> Unit = {},
     onMarkAllAsRead: () -> Unit = {},
     onNotificationClick: (AppNotification) -> Unit = {},
     onDeleteNotification: (AppNotification) -> Unit = {},
@@ -53,6 +55,10 @@ fun NotificationScreen(
     onMessagesClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    LaunchedEffect(Unit) {
+        onScreenOpened()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -260,7 +266,7 @@ private fun NotificationCard(
             Spacer(modifier = Modifier.size(4.dp))
 
             Text(
-                text = notification.createdAt,
+                text = notification.createdAt.toString(),
                 fontSize = 12.sp,
                 color = Color(0xFF8A8A8A)
             )

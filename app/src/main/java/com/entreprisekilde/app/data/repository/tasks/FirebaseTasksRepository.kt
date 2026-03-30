@@ -23,6 +23,7 @@ class FirebaseTasksRepository : TasksRepository {
                         address = doc.getString("address") ?: "",
                         date = doc.getString("date") ?: "",
                         assignTo = doc.getString("assignTo") ?: "",
+                        assignedUserId = doc.getString("assignedUserId") ?: "",
                         taskDetails = doc.getString("taskDetails") ?: "",
                         status = parseStatus(doc.getString("status"))
                     )
@@ -42,6 +43,7 @@ class FirebaseTasksRepository : TasksRepository {
             "address" to newTask.address,
             "date" to newTask.date,
             "assignTo" to newTask.assignTo,
+            "assignedUserId" to newTask.assignedUserId,
             "taskDetails" to newTask.taskDetails,
             "status" to newTask.status.name,
             "createdAt" to System.currentTimeMillis(),
@@ -62,6 +64,7 @@ class FirebaseTasksRepository : TasksRepository {
             "address" to updatedTask.address,
             "date" to updatedTask.date,
             "assignTo" to updatedTask.assignTo,
+            "assignedUserId" to updatedTask.assignedUserId,
             "taskDetails" to updatedTask.taskDetails,
             "status" to updatedTask.status.name,
             "updatedAt" to System.currentTimeMillis()

@@ -78,34 +78,105 @@ object DemoSeedData {
 
     fun createMessageThreads(): List<MessageThread> {
         return listOf(
-            MessageThread(1, "Boss", "Can you work 2 hours extra today?", 2),
-            MessageThread(2, "Support Team", "Try to call John before arriving.", 1),
-            MessageThread(3, "Shift Planner", "There is 1 extra shift available tomorrow.", 0),
-            MessageThread(4, "John Miller", "I finished the task at the customer site.", 0)
+            MessageThread(
+                id = 1,
+                recipientId = "boss",
+                recipientName = "Boss",
+                lastMessage = "Can you work 2 hours extra today?",
+                unreadCount = 2
+            ),
+            MessageThread(
+                id = 2,
+                recipientId = "support_team",
+                recipientName = "Support Team",
+                lastMessage = "Try to call John before arriving.",
+                unreadCount = 1
+            ),
+            MessageThread(
+                id = 3,
+                recipientId = "shift_planner",
+                recipientName = "Shift Planner",
+                lastMessage = "There is 1 extra shift available tomorrow.",
+                unreadCount = 0
+            ),
+            MessageThread(
+                id = 4,
+                recipientId = "john_miller",
+                recipientName = "John Miller",
+                lastMessage = "I finished the task at the customer site.",
+                unreadCount = 0
+            )
         )
     }
 
     fun createChatMessages(): Map<Int, List<ChatMessage>> {
         return mapOf(
             1 to listOf(
-                ChatMessage(1, 1, "Can you work 2 hours extra today?", false, "09:10"),
-                ChatMessage(2, 1, "Yes, that is fine for me.", true, "09:12"),
-                ChatMessage(3, 1, "Perfect, thank you.", false, "09:13")
+                ChatMessage(
+                    id = 1,
+                    threadId = 1,
+                    senderId = "boss",
+                    text = "Can you work 2 hours extra today?",
+                    time = "09:10"
+                ),
+                ChatMessage(
+                    id = 2,
+                    threadId = 1,
+                    senderId = "me",
+                    text = "Yes, that is fine for me.",
+                    time = "09:12"
+                ),
+                ChatMessage(
+                    id = 3,
+                    threadId = 1,
+                    senderId = "boss",
+                    text = "Perfect, thank you.",
+                    time = "09:13"
+                )
             ),
             2 to listOf(
-                ChatMessage(4, 2, "Try to call John before arriving.", false, "08:45"),
-                ChatMessage(5, 2, "Okay, I will do that.", true, "08:47")
+                ChatMessage(
+                    id = 4,
+                    threadId = 2,
+                    senderId = "support_team",
+                    text = "Try to call John before arriving.",
+                    time = "08:45"
+                ),
+                ChatMessage(
+                    id = 5,
+                    threadId = 2,
+                    senderId = "me",
+                    text = "Okay, I will do that.",
+                    time = "08:47"
+                )
             ),
             3 to listOf(
-                ChatMessage(6, 3, "There is 1 extra shift available tomorrow.", false, "07:30")
+                ChatMessage(
+                    id = 6,
+                    threadId = 3,
+                    senderId = "shift_planner",
+                    text = "There is 1 extra shift available tomorrow.",
+                    time = "07:30"
+                )
             ),
             4 to listOf(
-                ChatMessage(7, 4, "I finished the task at the customer site.", false, "15:05"),
-                ChatMessage(8, 4, "Great work, thank you.", true, "15:08")
+                ChatMessage(
+                    id = 7,
+                    threadId = 4,
+                    senderId = "john_miller",
+                    text = "I finished the task at the customer site.",
+                    time = "15:05"
+                ),
+                ChatMessage(
+                    id = 8,
+                    threadId = 4,
+                    senderId = "me",
+                    text = "Great work, thank you.",
+                    time = "15:08"
+                )
             )
         )
     }
-
     fun createTimesheetEntries(): List<TimesheetEntry> {
         val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val today = LocalDate.now()

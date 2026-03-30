@@ -11,5 +11,5 @@ data class EmployeeUser(
     val role: String = "employee"
 ) {
     val fullName: String
-        get() = "$firstName $lastName"
+        get() = "$firstName $lastName".trim()
 }

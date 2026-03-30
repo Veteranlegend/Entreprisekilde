@@ -1,17 +1,41 @@
 package com.entreprisekilde.app.ui.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.entreprisekilde.app.data.model.notifications.NotificationType
 import com.entreprisekilde.app.data.repository.messages.FirebaseMessagesRepository
-import com.entreprisekilde.app.data.repository.notifications.DemoNotificationRepository
+import com.entreprisekilde.app.data.repository.notifications.FirebaseNotificationRepository
 import com.entreprisekilde.app.data.repository.tasks.FirebaseTasksRepository
-import com.entreprisekilde.app.data.repository.timesheet.DemoTimesheetRepository
+import com.entreprisekilde.app.data.repository.timesheet.FirebaseTimesheetRepository
 import com.entreprisekilde.app.data.repository.users.FirebaseUsersRepository
 import com.entreprisekilde.app.ui.admin.calendar.CalendarDayScreen
 import com.entreprisekilde.app.ui.admin.calendar.CalendarScreen
@@ -37,18 +61,18 @@ import com.entreprisekilde.app.ui.notifications.NotificationViewModel
 
 @Composable
 fun EntreprisekildeApp() {
-
     val currentScreen = remember { mutableStateOf<Screen>(Screen.Login) }
     val selectedCalendarDate = remember { mutableStateOf("") }
     val taskDetailsBackTarget = remember { mutableStateOf<Screen>(Screen.Tasks) }
     val profileImageUri = remember { mutableStateOf<String?>(null) }
     val selectedTaskId = remember { mutableStateOf<String?>(null) }
+    val showNewChatDialog = remember { mutableStateOf(false) }
 
     val userRepository = remember { FirebaseUsersRepository() }
     val tasksRepository = remember { FirebaseTasksRepository() }
     val messagesRepository = remember { FirebaseMessagesRepository() }
-    val timesheetRepository = remember { DemoTimesheetRepository() }
-    val notificationRepository = remember { DemoNotificationRepository() }
+    val timesheetRepository = remember { FirebaseTimesheetRepository() }
+    val notificationRepository = remember { FirebaseNotificationRepository() }
 
     val usersViewModel: UsersViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -92,13 +116,20 @@ fun EntreprisekildeApp() {
 
     val users = usersViewModel.users
     val tasks = tasksViewModel.tasks
-    val taskAssignedUserOptions = users
-        .map { "${it.firstName} ${it.lastName}".trim() }
+    val taskAssignedUsers = users
+        .filter { it.id.isNotBlank() }
+        .distinctBy { it.id }
+
+    android.util.Log.d("USER_DEBUG", "ALL USERS = ${users.map { "${it.fullName} | id=${it.id}" }}")
+    android.util.Log.d("USER_DEBUG", "TASK USERS = ${taskAssignedUsers.map { "${it.fullName} | id=${it.id}" }}")
+
+    val taskAssignedUserOptions = taskAssignedUsers
+        .map { it.fullName }
         .filter { it.isNotBlank() }
         .distinct()
 
     val notifications = notificationViewModel.notifications
-    val unreadNotificationCount = notificationViewModel.unreadCount()
+    val unreadNotificationCount = notificationViewModel.unreadCount
 
     val selectedTask = tasks.firstOrNull { it.id == selectedTaskId.value }
     val selectedUser = usersViewModel.selectedUser
@@ -110,25 +141,116 @@ fun EntreprisekildeApp() {
     val profileEmail = loggedInUser?.email ?: "admin@entreprisekilden.dk"
     val profilePhoneNumber = loggedInUser?.phoneNumber ?: ""
 
-    val timesheetEmployees = timesheetViewModel.getEmployees()
+    val timesheetEmployees = timesheetViewModel.employees
+
+    val availableChatRecipients = users.filter { user ->
+        user.id.isNotBlank() && user.id != loggedInUser?.id
+    }
 
     LaunchedEffect(Unit) {
         usersViewModel.startAuthObserver()
     }
 
-    LaunchedEffect(loggedInUser, isCheckingAuth) {
+
+
+    LaunchedEffect(loggedInUser?.id, isCheckingAuth) {
         if (!isCheckingAuth) {
-            currentScreen.value = if (loggedInUser != null) {
-                Screen.Dashboard
+            if (loggedInUser == null) {
+                notificationViewModel.stopListening()
+                currentScreen.value = Screen.Login
             } else {
-                Screen.Login
+                notificationViewModel.startListeningForUser(loggedInUser.id)
+
+                if (currentScreen.value == Screen.Login) {
+                    currentScreen.value = Screen.Dashboard
+                }
             }
         }
     }
 
+
+    if (showNewChatDialog.value) {
+        AlertDialog(
+            onDismissRequest = {
+                showNewChatDialog.value = false
+            },
+            title = {
+                Text(
+                    text = "Select recipient",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                if (availableChatRecipients.isEmpty()) {
+                    Text("No available users found.")
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(availableChatRecipients, key = { it.id }) { user ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White, RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        showNewChatDialog.value = false
+                                        messagesViewModel.createOrGetThread(
+                                            recipientId = user.id,
+                                            recipientName = user.fullName
+                                        ) {
+                                            currentScreen.value = Screen.Chat
+                                        }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .background(Color(0xFFB7DDFC), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Person,
+                                        contentDescription = null,
+                                        tint = Color(0xFF49A7EE)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.size(12.dp))
+
+                                Text(
+                                    text = user.fullName,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showNewChatDialog.value = false
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Close")
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color(0xFFF4F7FB)
+        )
+    }
+
     val goToDashboard = { currentScreen.value = Screen.Dashboard }
     val goToMessages = { currentScreen.value = Screen.Messages }
-    val goToNotifications = { currentScreen.value = Screen.Notifications }
+    val goToNotifications = {
+        notificationViewModel.onNotificationsOpened()
+        currentScreen.value = Screen.Notifications
+    }
     val goToProfile = { currentScreen.value = Screen.Profile }
     val goToTasks = { currentScreen.value = Screen.Tasks }
     val goToCreateTask = { currentScreen.value = Screen.CreateTask }
@@ -138,7 +260,6 @@ fun EntreprisekildeApp() {
     val goToTimesheetEmployees = { currentScreen.value = Screen.TimesheetEmployees }
 
     when (currentScreen.value) {
-
         Screen.Login -> {
             LoginScreen(
                 errorMessage = usersViewModel.loginErrorMessage,
@@ -170,6 +291,9 @@ fun EntreprisekildeApp() {
                     messagesViewModel.selectThread(it)
                     currentScreen.value = Screen.Chat
                 },
+                onNewChatClick = {
+                    showNewChatDialog.value = true
+                },
                 onDeleteThread = {
                     messagesViewModel.deleteThread(it)
                 },
@@ -184,20 +308,22 @@ fun EntreprisekildeApp() {
             val thread = messagesViewModel.selectedThread.value
             val messages = messagesViewModel.getMessagesForSelectedThread()
 
-            if (thread != null && messages != null) {
+            if (thread != null) {
                 ChatScreen(
                     thread = thread,
                     messages = messages,
+                    loggedInUserId = loggedInUser?.id ?: "",
                     onBack = goToMessages,
                     onSendMessage = { msg ->
-                        messagesViewModel.sendMessage(msg)
-
-                        notificationViewModel.addMessageNotification(
-                            senderName = thread.name,
-                            threadId = thread.id
+                        val senderId = loggedInUser?.id ?: return@ChatScreen
+                        messagesViewModel.sendMessage(
+                            senderId = senderId,
+                            message = msg
                         )
                     }
                 )
+            } else {
+                currentScreen.value = Screen.Messages
             }
         }
 
@@ -205,6 +331,7 @@ fun EntreprisekildeApp() {
             TasksScreen(
                 tasks = tasks,
                 assignedUserOptions = taskAssignedUserOptions,
+                unreadNotificationCount = unreadNotificationCount,
                 isLoading = tasksViewModel.isLoading.value,
                 errorMessage = tasksViewModel.errorMessage.value,
                 onRetry = {
@@ -230,6 +357,8 @@ fun EntreprisekildeApp() {
                     tasksViewModel.updateTask(updatedTask)
                 },
                 onHomeClick = goToDashboard,
+                onMessagesClick = goToMessages,
+                onNotificationsClick = goToNotifications,
                 onProfileClick = goToProfile
             )
         }
@@ -259,26 +388,27 @@ fun EntreprisekildeApp() {
         }
 
         Screen.CreateTask -> {
-            CreateTaskScreen(
-                unreadNotificationCount = unreadNotificationCount,
-                onBack = goToDashboard,
-                onCreateTask = { task ->
-                    tasksViewModel.addTask(task)
+                CreateTaskScreen(
+                    unreadNotificationCount = unreadNotificationCount,
+                    onBack = goToDashboard,
+                    onCreateTask = { task ->
+                        tasksViewModel.addTask(task)
 
-                    notificationViewModel.addTaskAssignedNotification(
-                        taskName = task.customer,
-                        assignedTo = task.assignTo
-                    )
-
-                    currentScreen.value = Screen.Tasks
-                },
-                assignedUserOptions = taskAssignedUserOptions,
-                onHomeClick = goToDashboard,
-                onMessagesClick = goToMessages,
-                onNotificationsClick = goToNotifications,
-                onProfileClick = goToProfile
-            )
-        }
+                        if (task.assignedUserId.isNotBlank()) {
+                            notificationViewModel.addTaskAssignedNotification(
+                                taskName = task.customer,
+                                assignedUserId = task.assignedUserId,
+                                assignedToName = task.assignTo
+                            )
+                        }
+                    },
+                    assignedUserOptions = taskAssignedUsers,
+                    onHomeClick = goToDashboard,
+                    onMessagesClick = goToMessages,
+                    onNotificationsClick = goToNotifications,
+                    onProfileClick = goToProfile
+                )
+            }
 
         Screen.Calendar -> {
             CalendarScreen(
@@ -332,7 +462,7 @@ fun EntreprisekildeApp() {
         Screen.Timesheet -> {
             TimesheetScreen(
                 employeeName = timesheetViewModel.selectedEmployee.value,
-                timesheets = timesheetViewModel.getEntriesForSelectedEmployee(),
+                timesheets = timesheetViewModel.entriesForSelectedEmployee,
                 unreadNotificationCount = unreadNotificationCount,
                 onBack = goToTimesheetEmployees,
                 onApproveEntry = { entryId ->
@@ -340,6 +470,9 @@ fun EntreprisekildeApp() {
                 },
                 onDeclineEntry = { entryId ->
                     timesheetViewModel.declineEntry(entryId)
+                },
+                onUndoEntryStatus = { entryId ->
+                    timesheetViewModel.undoEntryStatus(entryId)
                 },
                 onDeleteEntry = { entryId ->
                     timesheetViewModel.deleteEntry(entryId)
@@ -378,7 +511,6 @@ fun EntreprisekildeApp() {
                     onBack = goToUsers,
                     onSaveUser = { updatedUser ->
                         usersViewModel.updateUser(updatedUser)
-                        currentScreen.value = Screen.Employees
                     },
                     onHomeClick = goToDashboard,
                     onMessagesClick = goToMessages,
@@ -445,22 +577,27 @@ fun EntreprisekildeApp() {
                 notifications = notifications,
                 unreadCount = unreadNotificationCount,
                 onBack = goToDashboard,
-                onMarkAllAsRead = { notificationViewModel.markAllAsRead() },
+                onScreenOpened = {
+                    notificationViewModel.onNotificationsOpened()
+                },
+                onMarkAllAsRead = {
+                    notificationViewModel.markAllAsRead()
+                },
                 onNotificationClick = { notification ->
-                    notificationViewModel.markAsRead(notification.id)
-
-                    when (notification.type) {
-                        NotificationType.MESSAGE -> {
-                            val id = notification.relatedThreadId
-                            if (id != null && messagesViewModel.selectThreadById(id)) {
-                                currentScreen.value = Screen.Chat
-                            } else {
-                                currentScreen.value = Screen.Messages
+                    notificationViewModel.markAsRead(notification.id) {
+                        when (notification.type) {
+                            NotificationType.MESSAGE -> {
+                                val threadId = notification.relatedThreadId
+                                if (threadId != null && messagesViewModel.selectThreadById(threadId)) {
+                                    currentScreen.value = Screen.Chat
+                                } else {
+                                    currentScreen.value = Screen.Messages
+                                }
                             }
-                        }
 
-                        NotificationType.TASK_ASSIGNED -> {
-                            currentScreen.value = Screen.Tasks
+                            NotificationType.TASK_ASSIGNED -> {
+                                currentScreen.value = Screen.Tasks
+                            }
                         }
                     }
                 },
@@ -471,10 +608,6 @@ fun EntreprisekildeApp() {
                 onMessagesClick = goToMessages,
                 onProfileClick = goToProfile
             )
-        }
-
-        else -> {
-            currentScreen.value = Screen.Dashboard
         }
     }
 }

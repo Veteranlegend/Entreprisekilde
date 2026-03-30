@@ -14,6 +14,8 @@ interface TimesheetRepository {
 
     suspend fun declineEntry(entryId: String)
 
+    suspend fun undoEntryStatus(entryId: String)
+
     suspend fun deleteEntry(entryId: String)
 
     suspend fun assignShift(newEntry: TimesheetEntry)

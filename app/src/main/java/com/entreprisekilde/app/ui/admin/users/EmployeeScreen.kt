@@ -164,7 +164,7 @@ fun EmployeeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 20.dp)
             ) {
-                items(filteredUsers, key = { it.id }) { user ->
+                items(filteredUsers) { user ->
                     UserCard(
                         user = user,
                         onClick = { onUserClick(user) }

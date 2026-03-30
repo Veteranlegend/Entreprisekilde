@@ -4,17 +4,33 @@ import com.entreprisekilde.app.data.model.notifications.AppNotification
 
 interface NotificationRepository {
 
-    suspend fun getNotifications(): List<AppNotification>
+    suspend fun getNotifications(userId: String): List<AppNotification>
 
-    suspend fun addMessageNotification(senderName: String, threadId: Int)
+    fun observeNotifications(
+        userId: String,
+        onChanged: (List<AppNotification>) -> Unit,
+        onError: (Exception) -> Unit = {}
+    )
 
-    suspend fun addTaskAssignedNotification(taskName: String, assignedTo: String)
+    fun removeNotificationListener()
 
-    suspend fun markAsRead(notificationId: Int)
+    suspend fun addMessageNotification(
+        senderName: String,
+        recipientUserId: String,
+        threadId: Int
+    )
 
-    suspend fun markAllAsRead()
+    suspend fun addTaskAssignedNotification(
+        taskName: String,
+        assignedUserId: String,
+        assignedToName: String
+    )
 
-    suspend fun unreadCount(): Int
+    suspend fun markAsRead(notificationId: String)
 
-    suspend fun deleteNotification(notificationId: Int)
+    suspend fun markAllAsRead(userId: String)
+
+    suspend fun unreadCount(userId: String): Int
+
+    suspend fun deleteNotification(notificationId: String)
 }

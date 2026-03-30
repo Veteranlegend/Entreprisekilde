@@ -3,7 +3,7 @@ package com.entreprisekilde.app.data.model.messages
 data class ChatMessage(
     val id: Int,
     val threadId: Int,
+    val senderId: String,
     val text: String,
-    val isFromMe: Boolean,
     val time: String = ""
 )

@@ -9,9 +9,24 @@ interface MessagesRepository {
 
     suspend fun getMessages(threadId: Int): List<ChatMessage>
 
+    fun startMessagesListener(
+        threadId: Int,
+        onUpdate: (List<ChatMessage>) -> Unit,
+        onError: (String) -> Unit = {}
+    ): () -> Unit
+
     suspend fun deleteThread(threadId: Int)
 
-    suspend fun sendMessage(threadId: Int, text: String)
+    suspend fun sendMessage(
+        threadId: Int,
+        senderId: String,
+        text: String
+    )
 
     suspend fun findThreadById(threadId: Int): MessageThread?
+
+    suspend fun createOrGetThread(
+        recipientId: String,
+        recipientName: String
+    ): MessageThread
 }

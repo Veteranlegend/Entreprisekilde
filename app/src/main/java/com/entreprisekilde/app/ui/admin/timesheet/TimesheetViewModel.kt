@@ -21,17 +21,9 @@ class TimesheetViewModel(
         loadEntriesForSelectedEmployee()
     }
 
-    fun getEmployees(): List<String> {
-        return employees
-    }
-
     fun selectEmployee(employeeName: String) {
         selectedEmployee.value = employeeName
         loadEntriesForSelectedEmployee()
-    }
-
-    fun getEntriesForSelectedEmployee(): List<TimesheetEntry> {
-        return entriesForSelectedEmployee
     }
 
     fun approveEntry(entryId: String) {
@@ -44,6 +36,13 @@ class TimesheetViewModel(
     fun declineEntry(entryId: String) {
         viewModelScope.launch {
             repository.declineEntry(entryId)
+            refreshEntriesForSelectedEmployee()
+        }
+    }
+
+    fun undoEntryStatus(entryId: String) {
+        viewModelScope.launch {
+            repository.undoEntryStatus(entryId)
             refreshEntriesForSelectedEmployee()
         }
     }
