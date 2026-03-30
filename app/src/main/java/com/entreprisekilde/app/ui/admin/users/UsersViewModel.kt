@@ -6,8 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.entreprisekilde.app.data.model.auth.LoginResult
 import com.entreprisekilde.app.data.model.users.EmployeeUser
 import com.entreprisekilde.app.data.repository.users.UserRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class UsersViewModel(
@@ -28,6 +30,18 @@ class UsersViewModel(
     var loginErrorMessage by mutableStateOf<String?>(null)
         private set
 
+    var loginInfoMessage by mutableStateOf<String?>(null)
+        private set
+
+    var isLoading by mutableStateOf(false)
+        private set
+
+    var isLocked by mutableStateOf(false)
+        private set
+
+    private var failedAttempts = 0
+    private val maxAttempts = 5
+
     var createUserMessage by mutableStateOf<String?>(null)
         private set
 
@@ -38,6 +52,15 @@ class UsersViewModel(
         private set
 
     var updateUserErrorMessage by mutableStateOf<String?>(null)
+        private set
+
+    var changePasswordMessage by mutableStateOf<String?>(null)
+        private set
+
+    var changePasswordErrorMessage by mutableStateOf<String?>(null)
+        private set
+
+    var isChangingPassword by mutableStateOf(false)
         private set
 
     init {
@@ -61,22 +84,127 @@ class UsersViewModel(
     }
 
     fun login(username: String, password: String) {
-        viewModelScope.launch {
-            val matchedUser = userRepository.login(username, password)
+        if (isLocked) return
 
-            if (matchedUser != null) {
-                loggedInUser = matchedUser
-                loginErrorMessage = null
-            } else {
-                loginErrorMessage = "Invalid username or password"
+        viewModelScope.launch {
+            isLoading = true
+            loginErrorMessage = null
+            loginInfoMessage = null
+
+            when (val result = userRepository.login(username, password)) {
+                is LoginResult.Success -> {
+                    loggedInUser = result.user
+                    failedAttempts = 0
+                    loginErrorMessage = null
+                    loginInfoMessage = null
+                }
+
+                is LoginResult.Error -> {
+                    failedAttempts++
+
+                    if (failedAttempts >= maxAttempts) {
+                        isLocked = true
+                        loginErrorMessage = "Too many failed attempts. Try again later."
+
+                        delay(30_000)
+
+                        failedAttempts = 0
+                        isLocked = false
+                        loginErrorMessage = null
+                        loginInfoMessage = null
+                    } else {
+                        loginErrorMessage = result.message
+                        loginInfoMessage = "Please try again."
+                    }
+                }
+
+                is LoginResult.TooManyAttempts -> {
+                    isLocked = true
+                    loginErrorMessage = "Too many failed attempts. Try again later."
+
+                    delay(30_000)
+
+                    failedAttempts = 0
+                    isLocked = false
+                    loginErrorMessage = null
+                    loginInfoMessage = null
+                }
             }
+
+            isLoading = false
         }
+    }
+
+    fun changeOwnPassword(
+        currentPassword: String,
+        newPassword: String,
+        confirmPassword: String
+    ) {
+        viewModelScope.launch {
+            changePasswordMessage = null
+            changePasswordErrorMessage = null
+
+            val cleanCurrentPassword = currentPassword.trim()
+            val cleanNewPassword = newPassword.trim()
+            val cleanConfirmPassword = confirmPassword.trim()
+
+            when {
+                cleanCurrentPassword.isBlank() || cleanNewPassword.isBlank() || cleanConfirmPassword.isBlank() -> {
+                    changePasswordErrorMessage = "Please fill in all password fields."
+                    return@launch
+                }
+
+                cleanNewPassword.length < 6 -> {
+                    changePasswordErrorMessage = "New password must be at least 6 characters."
+                    return@launch
+                }
+
+                cleanNewPassword != cleanConfirmPassword -> {
+                    changePasswordErrorMessage = "New passwords do not match."
+                    return@launch
+                }
+
+                cleanCurrentPassword == cleanNewPassword -> {
+                    changePasswordErrorMessage = "New password must be different from current password."
+                    return@launch
+                }
+            }
+
+            isChangingPassword = true
+
+            val result = userRepository.changeOwnPassword(
+                currentPassword = cleanCurrentPassword,
+                newPassword = cleanNewPassword
+            )
+
+            result
+                .onSuccess {
+                    changePasswordMessage = "Password changed successfully."
+                    changePasswordErrorMessage = null
+                }
+                .onFailure { exception ->
+                    changePasswordErrorMessage = exception.message ?: "Failed to change password."
+                    changePasswordMessage = null
+                }
+
+            isChangingPassword = false
+        }
+    }
+
+    fun clearChangePasswordMessages() {
+        changePasswordMessage = null
+        changePasswordErrorMessage = null
     }
 
     fun logout() {
         userRepository.logout()
         loggedInUser = null
         loginErrorMessage = null
+        loginInfoMessage = null
+        isLoading = false
+        isLocked = false
+        failedAttempts = 0
+        clearChangePasswordMessages()
     }
 
     fun selectUser(user: EmployeeUser) {

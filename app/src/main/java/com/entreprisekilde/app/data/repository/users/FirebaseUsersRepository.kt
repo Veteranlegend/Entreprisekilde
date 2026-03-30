@@ -1,10 +1,20 @@
 package com.entreprisekilde.app.data.repository.users
 
+import com.entreprisekilde.app.data.model.auth.LoginResult
 import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
+import com.google.firebase.FirebaseTooManyRequestsException
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuth.AuthStateListener
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
 class FirebaseUsersRepository : UserRepository {
 
@@ -13,43 +23,104 @@ class FirebaseUsersRepository : UserRepository {
 
     private var authStateListener: AuthStateListener? = null
 
-    override suspend fun login(username: String, password: String): EmployeeUser? {
+    override suspend fun login(username: String, password: String): LoginResult {
         return try {
-            val cleanUsername = username.trim()
+            val cleanInput = username.trim()
             val cleanPassword = password.trim()
 
-            val querySnapshot = firestore.collection("users")
-                .whereEqualTo("username", cleanUsername)
-                .get()
-                .await()
+            if (cleanInput.isBlank() || cleanPassword.isBlank()) {
+                return LoginResult.Error("Please enter both username and password.")
+            }
 
-            val userDoc = querySnapshot.documents.firstOrNull() ?: return null
-            val email = userDoc.getString("email") ?: return null
+            if (cleanInput.contains("@")) {
+                val emailInput = cleanInput.lowercase()
 
-            auth.signInWithEmailAndPassword(email, cleanPassword).await()
+                auth.signInWithEmailAndPassword(emailInput, cleanPassword).await()
 
-            val firebaseUid = auth.currentUser?.uid ?: return null
+                val firebaseUid = auth.currentUser?.uid
+                    ?: return LoginResult.Error("Login failed. Please try again.")
 
-            val user = EmployeeUser(
-                id = firebaseUid,
-                firstName = userDoc.getString("firstName") ?: "",
-                lastName = userDoc.getString("lastName") ?: "",
-                email = email,
-                phoneNumber = userDoc.getString("phoneNumber") ?: "",
-                username = userDoc.getString("username") ?: "",
-                password = "",
-                role = userDoc.getString("role") ?: "employee"
-            )
+                val userDoc = firestore.collection("users")
+                    .document(firebaseUid)
+                    .get(Source.SERVER)
+                    .await()
 
-            firestore.collection("users")
-                .document(firebaseUid)
-                .set(user)
-                .await()
+                val authEmail = auth.currentUser?.email.orEmpty()
 
-            user
+                val user = if (userDoc.exists()) {
+                    documentToEmployeeUser(userDoc)
+                } else {
+                    EmployeeUser(
+                        id = firebaseUid,
+                        firstName = "",
+                        lastName = "",
+                        email = authEmail,
+                        phoneNumber = "",
+                        username = "",
+                        password = "",
+                        role = "employee"
+                    )
+                }
+
+                LoginResult.Success(user)
+            } else {
+                // Username is now case-sensitive
+                val cleanUsername = cleanInput
+
+                val usernameQuerySnapshot = firestore.collection("users")
+                    .whereEqualTo("username", cleanUsername)
+                    .limit(1)
+                    .get(Source.SERVER)
+                    .await()
+
+                val matchedDoc = usernameQuerySnapshot.documents.firstOrNull()
+                    ?: return LoginResult.Error("Invalid username or password.")
+
+                val email = matchedDoc.getString("email")?.trim().orEmpty()
+
+                if (email.isBlank()) {
+                    return LoginResult.Error("This account is missing an email.")
+                }
+
+                auth.signInWithEmailAndPassword(email.lowercase(), cleanPassword).await()
+
+                val firebaseUid = auth.currentUser?.uid
+                    ?: return LoginResult.Error("Login failed. Please try again.")
+
+                val latestUserDoc = firestore.collection("users")
+                    .document(firebaseUid)
+                    .get(Source.SERVER)
+                    .await()
+
+                val user = if (latestUserDoc.exists()) {
+                    documentToEmployeeUser(latestUserDoc)
+                } else {
+                    EmployeeUser(
+                        id = firebaseUid,
+                        firstName = matchedDoc.getString("firstName")?.trim().orEmpty(),
+                        lastName = matchedDoc.getString("lastName")?.trim().orEmpty(),
+                        email = email,
+                        phoneNumber = matchedDoc.getString("phoneNumber")?.trim().orEmpty(),
+                        username = matchedDoc.getString("username")?.trim().orEmpty(),
+                        password = "",
+                        role = matchedDoc.getString("role")?.trim().orEmpty().ifBlank { "employee" }
+                    )
+                }
+
+                LoginResult.Success(user)
+            }
+        } catch (e: FirebaseTooManyRequestsException) {
+            e.printStackTrace()
+            LoginResult.TooManyAttempts
+        } catch (e: FirebaseAuthInvalidUserException) {
+            e.printStackTrace()
+            LoginResult.Error("Invalid username or password.")
+        } catch (e: FirebaseAuthInvalidCredentialsException) {
+            e.printStackTrace()
+            LoginResult.Error("Invalid username or password.")
         } catch (e: Exception) {
             e.printStackTrace()
-            null
+            LoginResult.Error("Login failed. Please try again.")
         }
     }
 
@@ -61,47 +132,10 @@ class FirebaseUsersRepository : UserRepository {
                 .await()
 
             if (directDoc.exists()) {
-                return documentToEmployeeUser(directDoc)
+                documentToEmployeeUser(directDoc)
+            } else {
+                null
             }
-
-            val byIdQuery = firestore.collection("users")
-                .whereEqualTo("id", userId)
-                .get()
-                .await()
-
-            val byIdDoc = byIdQuery.documents.firstOrNull()
-            if (byIdDoc != null) {
-                val user = documentToEmployeeUser(byIdDoc)
-
-                firestore.collection("users")
-                    .document(userId)
-                    .set(user.copy(id = userId))
-                    .await()
-
-                return user.copy(id = userId)
-            }
-
-            val currentEmail = auth.currentUser?.email
-            if (!currentEmail.isNullOrBlank()) {
-                val byEmailQuery = firestore.collection("users")
-                    .whereEqualTo("email", currentEmail)
-                    .get()
-                    .await()
-
-                val byEmailDoc = byEmailQuery.documents.firstOrNull()
-                if (byEmailDoc != null) {
-                    val user = documentToEmployeeUser(byEmailDoc).copy(id = userId)
-
-                    firestore.collection("users")
-                        .document(userId)
-                        .set(user)
-                        .await()
-
-                    return user
-                }
-            }
-
-            null
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -153,24 +187,45 @@ class FirebaseUsersRepository : UserRepository {
         username: String,
         password: String
     ): Result<Unit> {
+        var secondaryApp: FirebaseApp? = null
+
         return try {
             val cleanFirstName = firstName.trim()
             val cleanLastName = lastName.trim()
-            val cleanEmail = email.trim()
+            val cleanEmail = email.trim().lowercase()
             val cleanPhoneNumber = phoneNumber.trim()
             val cleanUsername = username.trim()
             val cleanPassword = password.trim()
 
-            val existingUsername = firestore.collection("users")
+            val usernameQuerySnapshot = firestore.collection("users")
                 .whereEqualTo("username", cleanUsername)
+                .limit(1)
                 .get()
                 .await()
 
-            if (!existingUsername.isEmpty) {
+            if (!usernameQuerySnapshot.isEmpty) {
                 return Result.failure(Exception("Username already exists."))
             }
 
-            val result = auth.createUserWithEmailAndPassword(cleanEmail, cleanPassword).await()
+            val existingSignInMethods = auth.fetchSignInMethodsForEmail(cleanEmail).await()
+            if (!existingSignInMethods.signInMethods.isNullOrEmpty()) {
+                return Result.failure(Exception("Email already exists."))
+            }
+
+            val defaultOptions: FirebaseOptions = FirebaseApp.getInstance().options
+            val secondaryAppName = "secondary-${UUID.randomUUID()}"
+            secondaryApp = FirebaseApp.initializeApp(
+                auth.app.applicationContext,
+                defaultOptions,
+                secondaryAppName
+            )
+
+            if (secondaryApp == null) {
+                return Result.failure(Exception("Failed to initialize secondary Firebase app."))
+            }
+
+            val secondaryAuth = FirebaseAuth.getInstance(secondaryApp)
+            val result = secondaryAuth.createUserWithEmailAndPassword(cleanEmail, cleanPassword).await()
             val uid = result.user?.uid
                 ?: return Result.failure(Exception("Failed to create auth user."))
 
@@ -190,28 +245,48 @@ class FirebaseUsersRepository : UserRepository {
                 .set(user)
                 .await()
 
+            secondaryAuth.signOut()
+            secondaryApp.delete()
+
             Result.success(Unit)
         } catch (e: Exception) {
             e.printStackTrace()
+            secondaryApp?.delete()
             Result.failure(Exception(e.message ?: "Failed to create user."))
         }
     }
 
     override suspend fun updateUser(updatedUser: EmployeeUser): Result<Unit> {
         return try {
+            val cleanUsername = updatedUser.username.trim()
+
+            val usernameQuerySnapshot = firestore.collection("users")
+                .whereEqualTo("username", cleanUsername)
+                .limit(10)
+                .get()
+                .await()
+
+            val usernameTakenByAnotherUser = usernameQuerySnapshot.documents.any { doc ->
+                doc.id != updatedUser.id
+            }
+
+            if (usernameTakenByAnotherUser) {
+                return Result.failure(Exception("Username already exists."))
+            }
+
             val userData = mapOf(
                 "id" to updatedUser.id,
                 "firstName" to updatedUser.firstName.trim(),
                 "lastName" to updatedUser.lastName.trim(),
-                "email" to updatedUser.email.trim(),
+                "email" to updatedUser.email.trim().lowercase(),
                 "phoneNumber" to updatedUser.phoneNumber.trim(),
-                "username" to updatedUser.username.trim(),
+                "username" to cleanUsername,
                 "role" to updatedUser.role
             )
 
             firestore.collection("users")
                 .document(updatedUser.id)
-                .set(userData)
+                .update(userData)
                 .await()
 
             Result.success(Unit)
@@ -221,16 +296,47 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
-    private fun documentToEmployeeUser(doc: com.google.firebase.firestore.DocumentSnapshot): EmployeeUser {
+    override suspend fun changeOwnPassword(
+        currentPassword: String,
+        newPassword: String
+    ): Result<Unit> {
+        return try {
+            val cleanCurrentPassword = currentPassword.trim()
+            val cleanNewPassword = newPassword.trim()
+
+            val currentUser = auth.currentUser
+                ?: return Result.failure(Exception("No logged in user found."))
+
+            val email = currentUser.email?.trim().orEmpty()
+            if (email.isBlank()) {
+                return Result.failure(Exception("Current account email is missing."))
+            }
+
+            val credential = EmailAuthProvider.getCredential(email, cleanCurrentPassword)
+
+            currentUser.reauthenticate(credential).await()
+            currentUser.updatePassword(cleanNewPassword).await()
+
+            Result.success(Unit)
+        } catch (e: FirebaseAuthInvalidCredentialsException) {
+            e.printStackTrace()
+            Result.failure(Exception("Current password is incorrect."))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(Exception(e.message ?: "Failed to change password."))
+        }
+    }
+
+    private fun documentToEmployeeUser(doc: DocumentSnapshot): EmployeeUser {
         return EmployeeUser(
-            id = doc.getString("id") ?: doc.id,
-            firstName = doc.getString("firstName") ?: "",
-            lastName = doc.getString("lastName") ?: "",
-            email = doc.getString("email") ?: "",
-            phoneNumber = doc.getString("phoneNumber") ?: "",
-            username = doc.getString("username") ?: "",
+            id = doc.get("id")?.toString()?.trim().orEmpty().ifBlank { doc.id },
+            firstName = doc.get("firstName")?.toString()?.trim().orEmpty(),
+            lastName = doc.get("lastName")?.toString()?.trim().orEmpty(),
+            email = doc.get("email")?.toString()?.trim().orEmpty(),
+            phoneNumber = doc.get("phoneNumber")?.toString()?.trim().orEmpty(),
+            username = doc.get("username")?.toString()?.trim().orEmpty(),
             password = "",
-            role = doc.getString("role") ?: "employee"
+            role = doc.get("role")?.toString()?.trim().orEmpty().ifBlank { "employee" }
         )
     }
 }

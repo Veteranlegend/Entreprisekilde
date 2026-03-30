@@ -64,7 +64,6 @@ fun EntreprisekildeApp() {
     val currentScreen = remember { mutableStateOf<Screen>(Screen.Login) }
     val selectedCalendarDate = remember { mutableStateOf("") }
     val taskDetailsBackTarget = remember { mutableStateOf<Screen>(Screen.Tasks) }
-    val profileImageUri = remember { mutableStateOf<String?>(null) }
     val selectedTaskId = remember { mutableStateOf<String?>(null) }
     val showNewChatDialog = remember { mutableStateOf(false) }
 
@@ -120,9 +119,6 @@ fun EntreprisekildeApp() {
         .filter { it.id.isNotBlank() }
         .distinctBy { it.id }
 
-    android.util.Log.d("USER_DEBUG", "ALL USERS = ${users.map { "${it.fullName} | id=${it.id}" }}")
-    android.util.Log.d("USER_DEBUG", "TASK USERS = ${taskAssignedUsers.map { "${it.fullName} | id=${it.id}" }}")
-
     val taskAssignedUserOptions = taskAssignedUsers
         .map { it.fullName }
         .filter { it.isNotBlank() }
@@ -138,8 +134,10 @@ fun EntreprisekildeApp() {
 
     val profileFirstName = loggedInUser?.firstName ?: "Admin"
     val profileLastName = loggedInUser?.lastName ?: ""
+    val profileUsername = loggedInUser?.username ?: ""
     val profileEmail = loggedInUser?.email ?: "admin@entreprisekilden.dk"
     val profilePhoneNumber = loggedInUser?.phoneNumber ?: ""
+    val profileRole = loggedInUser?.role ?: "employee"
 
     val timesheetEmployees = timesheetViewModel.employees
 
@@ -150,8 +148,6 @@ fun EntreprisekildeApp() {
     LaunchedEffect(Unit) {
         usersViewModel.startAuthObserver()
     }
-
-
 
     LaunchedEffect(loggedInUser?.id, isCheckingAuth) {
         if (!isCheckingAuth) {
@@ -167,7 +163,6 @@ fun EntreprisekildeApp() {
             }
         }
     }
-
 
     if (showNewChatDialog.value) {
         AlertDialog(
@@ -263,6 +258,9 @@ fun EntreprisekildeApp() {
         Screen.Login -> {
             LoginScreen(
                 errorMessage = usersViewModel.loginErrorMessage,
+                infoMessage = usersViewModel.loginInfoMessage,
+                isLoading = usersViewModel.isLoading,
+                isLocked = usersViewModel.isLocked,
                 onLoginClick = { username, password ->
                     usersViewModel.login(username, password)
                 }
@@ -388,27 +386,27 @@ fun EntreprisekildeApp() {
         }
 
         Screen.CreateTask -> {
-                CreateTaskScreen(
-                    unreadNotificationCount = unreadNotificationCount,
-                    onBack = goToDashboard,
-                    onCreateTask = { task ->
-                        tasksViewModel.addTask(task)
+            CreateTaskScreen(
+                unreadNotificationCount = unreadNotificationCount,
+                onBack = goToDashboard,
+                onCreateTask = { task ->
+                    tasksViewModel.addTask(task)
 
-                        if (task.assignedUserId.isNotBlank()) {
-                            notificationViewModel.addTaskAssignedNotification(
-                                taskName = task.customer,
-                                assignedUserId = task.assignedUserId,
-                                assignedToName = task.assignTo
-                            )
-                        }
-                    },
-                    assignedUserOptions = taskAssignedUsers,
-                    onHomeClick = goToDashboard,
-                    onMessagesClick = goToMessages,
-                    onNotificationsClick = goToNotifications,
-                    onProfileClick = goToProfile
-                )
-            }
+                    if (task.assignedUserId.isNotBlank()) {
+                        notificationViewModel.addTaskAssignedNotification(
+                            taskName = task.customer,
+                            assignedUserId = task.assignedUserId,
+                            assignedToName = task.assignTo
+                        )
+                    }
+                },
+                assignedUserOptions = taskAssignedUsers,
+                onHomeClick = goToDashboard,
+                onMessagesClick = goToMessages,
+                onNotificationsClick = goToNotifications,
+                onProfileClick = goToProfile
+            )
+        }
 
         Screen.Calendar -> {
             CalendarScreen(
@@ -555,10 +553,39 @@ fun EntreprisekildeApp() {
                 email = profileEmail,
                 firstName = profileFirstName,
                 lastName = profileLastName,
+                username = profileUsername,
                 phoneNumber = profilePhoneNumber,
-                profileImageUri = profileImageUri.value,
-                onProfileImageChange = { newUri ->
-                    profileImageUri.value = newUri
+                role = profileRole,
+                passwordSuccessMessage = usersViewModel.changePasswordMessage,
+                passwordErrorMessage = usersViewModel.changePasswordErrorMessage,
+                isChangingPassword = usersViewModel.isChangingPassword,
+                onChangePassword = { currentPassword, newPassword, confirmPassword ->
+                    usersViewModel.changeOwnPassword(
+                        currentPassword = currentPassword,
+                        newPassword = newPassword,
+                        confirmPassword = confirmPassword
+                    )
+                },
+                onSaveProfile = { updatedFirstName, updatedLastName, updatedUsername, updatedEmail, updatedPhoneNumber ->
+                    val currentUser = usersViewModel.loggedInUser ?: return@ProfileScreen
+                    val updatedUser = if (profileRole.equals("admin", ignoreCase = true)) {
+                        currentUser.copy(
+                            firstName = updatedFirstName,
+                            lastName = updatedLastName,
+                            username = updatedUsername,
+                            email = updatedEmail,
+                            phoneNumber = updatedPhoneNumber
+                        )
+                    } else {
+                        currentUser.copy(
+                            username = updatedUsername
+                        )
+                    }
+
+                    usersViewModel.updateUser(updatedUser)
+                },
+                onClearPasswordMessages = {
+                    usersViewModel.clearChangePasswordMessages()
                 },
                 onLogoutClick = {
                     selectedTaskId.value = null

@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.data.repository.users
 
+import com.entreprisekilde.app.data.model.auth.LoginResult
 import com.entreprisekilde.app.data.model.users.EmployeeUser
 
 class DemoUsersRepository : UserRepository {
@@ -75,15 +76,25 @@ class DemoUsersRepository : UserRepository {
         return users.toList()
     }
 
-    override suspend fun login(username: String, password: String): EmployeeUser? {
-        val matchedUser = users.find {
-            it.username == username && it.password == password
+    override suspend fun login(username: String, password: String): LoginResult {
+        val cleanUsername = username.trim()
+        val cleanPassword = password.trim()
+
+        if (cleanUsername.isBlank() || cleanPassword.isBlank()) {
+            return LoginResult.Error("Please enter both username and password.")
         }
 
-        currentLoggedInUser = matchedUser
-        authObserver?.invoke(matchedUser?.id)
+        val matchedUser = users.find {
+            it.username == cleanUsername && it.password == cleanPassword
+        }
 
-        return matchedUser
+        return if (matchedUser != null) {
+            currentLoggedInUser = matchedUser
+            authObserver?.invoke(matchedUser.id)
+            LoginResult.Success(matchedUser)
+        } else {
+            LoginResult.Error("Invalid username or password.")
+        }
     }
 
     override suspend fun getUserById(userId: String): EmployeeUser? {
@@ -143,4 +154,15 @@ class DemoUsersRepository : UserRepository {
             Result.failure(Exception("User not found"))
         }
     }
+    override suspend fun changeOwnPassword(
+        currentPassword: String,
+        newPassword: String
+    ): Result<Unit> {
+        return if (currentPassword.isBlank() || newPassword.isBlank()) {
+            Result.failure(Exception("Password fields cannot be empty."))
+        } else {
+            Result.success(Unit)
+        }
+    }
 }
+

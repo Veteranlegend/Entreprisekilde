@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -62,7 +64,10 @@ private const val KEY_SAVED_USERNAME = "saved_username"
 @Composable
 fun LoginScreen(
     onLoginClick: (String, String) -> Unit = { _, _ -> },
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    infoMessage: String? = null,
+    isLoading: Boolean = false,
+    isLocked: Boolean = false
 ) {
     val context = LocalContext.current
     val prefs = remember {
@@ -73,7 +78,8 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(false) }
-    var visibleErrorMessage by remember { mutableStateOf<String?>(null) }
+    var visibleMessage by remember { mutableStateOf<String?>(null) }
+    var isErrorStyle by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val savedRememberMe = prefs.getBoolean(KEY_REMEMBER_ME, false)
@@ -85,13 +91,24 @@ fun LoginScreen(
         }
     }
 
-    LaunchedEffect(errorMessage) {
-        visibleErrorMessage = errorMessage
-        if (!errorMessage.isNullOrBlank()) {
-            delay(3000)
-            if (visibleErrorMessage == errorMessage) {
-                visibleErrorMessage = null
+    LaunchedEffect(errorMessage, infoMessage, isLocked) {
+        when {
+            !errorMessage.isNullOrBlank() -> {
+                visibleMessage = errorMessage
+                isErrorStyle = true
             }
+            !infoMessage.isNullOrBlank() -> {
+                visibleMessage = infoMessage
+                isErrorStyle = false
+            }
+            else -> {
+                visibleMessage = null
+            }
+        }
+
+        if (!visibleMessage.isNullOrBlank() && !isLocked) {
+            delay(4000)
+            visibleMessage = null
         }
     }
 
@@ -195,17 +212,6 @@ fun LoginScreen(
                 }
             )
 
-            if (!visibleErrorMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = visibleErrorMessage!!,
-                    color = Color(0xFFFFD6D6),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.width(290.dp)
-                )
-            }
-
             Spacer(modifier = Modifier.height(34.dp))
 
             Button(
@@ -227,23 +233,59 @@ fun LoginScreen(
 
                     onLoginClick(cleanUsername, cleanPassword)
                 },
+                enabled = !isLoading && !isLocked,
                 modifier = Modifier
                     .width(290.dp)
                     .height(54.dp),
                 shape = RoundedCornerShape(6.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF0454AD),
-                    contentColor = Color.White
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFF6C91BC),
+                    disabledContentColor = Color.White
                 )
             ) {
-                Text(
-                    text = "Login",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Text(
+                        text = if (isLocked) "Try again later" else "Login",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(100.dp))
+        }
+
+        if (!visibleMessage.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 54.dp, vertical = 74.dp)
+                    .background(
+                        color = if (isErrorStyle) Color(0xCCD32F2F) else Color(0xCC1565C0),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.20f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = visibleMessage!!,
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
@@ -261,8 +303,7 @@ private fun RememberMeRow(
     ) {
         Box(
             modifier = Modifier
-                .width(20.dp)
-                .height(20.dp)
+                .size(20.dp)
                 .background(
                     color = if (checked) Color(0xFF0454AD) else Color.White.copy(alpha = 0.92f),
                     shape = RoundedCornerShape(4.dp)
@@ -278,7 +319,8 @@ private fun RememberMeRow(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Checked",
-                    tint = Color.White
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
