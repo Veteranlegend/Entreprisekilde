@@ -4,18 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
@@ -33,18 +30,25 @@ fun CreateUserScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
     var passwordVisible by remember { mutableStateOf(false) }
     var localErrorMessage by remember { mutableStateOf("") }
 
-    // 🔹 NEW: Role
     var selectedRole by remember { mutableStateOf("employee") }
 
+    // 🔹 CLEAR old backend messages when entering screen
+    LaunchedEffect(Unit) {
+        onClearMessages()
+    }
+
+    // 🔹 RESET after success
     LaunchedEffect(successMessage) {
         if (!successMessage.isNullOrBlank()) {
             firstName = ""
@@ -77,12 +81,12 @@ fun CreateUserScreen(
                 onClearMessages()
                 onBack()
             }) {
-                Icon(Icons.Default.ArrowBack, null)
+                Icon(Icons.Default.ArrowBack, contentDescription = null)
             }
 
             Text(
                 "Create User",
-                fontSize = 24.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -95,23 +99,48 @@ fun CreateUserScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            FancyInputField("First Name", firstName) { firstName = it }
-            FancyInputField("Last Name", lastName) { lastName = it }
-            FancyInputField("Phone Number", phoneNumber) { phoneNumber = it }
-            FancyInputField("Email", email) { email = it }
-            FancyInputField("Username", username) { username = it }
+            FancyInputField("First Name", firstName) {
+                firstName = it
+                onClearMessages()
+            }
+
+            FancyInputField("Last Name", lastName) {
+                lastName = it
+                onClearMessages()
+            }
+
+            FancyInputField("Phone Number", phoneNumber) {
+                phoneNumber = it
+                onClearMessages()
+            }
+
+            FancyInputField("Email", email) {
+                email = it
+                onClearMessages()
+            }
+
+            FancyInputField("Username", username) {
+                username = it
+                onClearMessages()
+            }
 
             FancyPasswordField(
                 "Password",
                 password,
-                { password = it },
+                {
+                    password = it
+                    onClearMessages()
+                },
                 passwordVisible
-            ) { passwordVisible = !passwordVisible }
+            ) {
+                passwordVisible = !passwordVisible
+            }
 
-            // 🔴 ROLE SELECTOR (NEW)
+            // 🔹 ROLE
             Text("Role", fontWeight = FontWeight.Bold)
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+
                 OutlinedButton(
                     onClick = { selectedRole = "admin" },
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -131,6 +160,7 @@ fun CreateUserScreen(
                 }
             }
 
+            // 🔴 ERRORS
             if (localErrorMessage.isNotBlank()) {
                 Text(localErrorMessage, color = Color.Red)
             }
@@ -140,9 +170,10 @@ fun CreateUserScreen(
             }
 
             if (!successMessage.isNullOrBlank()) {
-                Text(successMessage, color = Color.Green)
+                Text(successMessage, color = Color(0xFF2E7D32))
             }
 
+            // 🔵 BUTTON
             Button(
                 onClick = {
 
@@ -167,10 +198,11 @@ fun CreateUserScreen(
                         phoneNumber.trim(),
                         username.trim(),
                         password.trim(),
-                        selectedRole // 🔥 IMPORTANT
+                        selectedRole
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Text("Create User")
             }
@@ -188,7 +220,8 @@ private fun FancyInputField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
     )
 }
 
@@ -209,10 +242,11 @@ private fun FancyPasswordField(
             IconButton(onClick = toggle) {
                 Icon(
                     if (visible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                    null
+                    contentDescription = null
                 )
             }
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
     )
 }

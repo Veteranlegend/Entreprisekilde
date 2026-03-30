@@ -21,6 +21,9 @@ class UsersViewModel(
     var selectedUser by mutableStateOf<User?>(null)
         private set
 
+
+
+
     var loggedInUser by mutableStateOf<User?>(null)
         private set
 
@@ -80,6 +83,13 @@ class UsersViewModel(
                     isCheckingAuth = false
                 }
             }
+        }
+    }
+
+    fun deleteUser(userId: String) {
+        viewModelScope.launch {
+            userRepository.deleteUser(userId)
+            loadUsers()
         }
     }
 
@@ -297,4 +307,6 @@ class UsersViewModel(
         super.onCleared()
         userRepository.stopObservingAuthState()
     }
+
+
 }

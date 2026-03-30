@@ -1,11 +1,9 @@
 package com.entreprisekilde.app.ui.admin.messages
-import androidx.compose.material.icons.filled.Add
-import com.entreprisekilde.app.data.model.messages.MessageThread
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -27,7 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Search
@@ -36,7 +35,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -56,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.entreprisekilde.app.data.model.messages.MessageThread
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
 import kotlin.math.roundToInt
@@ -86,48 +85,45 @@ fun MessagesScreen(
             .background(Color(0xFFF7F7F7))
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-
-            // 🔹 TOP BAR (keep your existing code)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFE0A673))
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(horizontal = 24.dp, vertical = 22.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.Black
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 Text(
                     text = "Message",
-                    fontSize = 26.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .background(Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Chat,
+                        contentDescription = "Messages",
+                        tint = Color(0xFF666666),
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
             }
 
-            // 🔹 CONTENT
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-
-                // 🔍 Search
                 OutlinedTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
@@ -151,7 +147,6 @@ fun MessagesScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 🔹 THREAD LIST
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
@@ -165,7 +160,6 @@ fun MessagesScreen(
                 }
             }
 
-            // 🔹 Bottom nav (keep yours)
             AppBottomNavBar(
                 selectedItem = BottomNavDestination.MESSAGES,
                 unreadNotificationCount = unreadNotificationCount,
@@ -176,7 +170,6 @@ fun MessagesScreen(
             )
         }
 
-        // 🔥 FLOATING BUTTON (THIS IS THE NEW PART)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -195,8 +188,6 @@ fun MessagesScreen(
             )
         }
     }
-
-
 }
 
 @Composable

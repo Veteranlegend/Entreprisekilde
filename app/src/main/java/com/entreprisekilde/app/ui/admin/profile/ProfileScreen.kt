@@ -1,17 +1,17 @@
 package com.entreprisekilde.app.ui.admin.profile
-import androidx.compose.foundation.text.KeyboardOptions
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Visibility
@@ -42,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -159,275 +159,255 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFF5EEE8),
-                        Color(0xFFF9F7F4),
-                        Color(0xFFFFFFFF)
-                    )
-                )
-            )
+            .background(Color(0xFFF3F3F3))
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color(0xFFFDFDFD))
+                .fillMaxWidth()
+                .background(Color(0xFFD9A06B))
+                .padding(horizontal = 24.dp, vertical = 22.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            Text(
+                text = "Profile",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFD9A06B))
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
             ) {
+                Icon(
+                    imageVector = Icons.Outlined.Person,
+                    contentDescription = "Profile",
+                    tint = Color(0xFF666666),
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(
+                start = 24.dp,
+                end = 24.dp,
+                top = 22.dp,
+                bottom = 24.dp
+            )
+        ) {
+            item {
                 Text(
-                    text = "Profile",
-                    fontSize = 28.sp,
+                    text = "General",
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
+            items(generalFields, key = { it.key }) { field ->
+                when (field.key) {
+                    "firstName" -> EditableProfileField(
+                        label = field.label,
+                        value = editableFirstName,
+                        onValueChange = { editableFirstName = it },
+                        isEditing = editingFields.contains(field.key),
+                        onToggleEdit = { toggleEditField(editingFields, field.key) }
+                    )
 
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Person,
-                        contentDescription = "Profile",
-                        tint = Color(0xFF666666),
-                        modifier = Modifier.size(24.dp)
+                    "lastName" -> EditableProfileField(
+                        label = field.label,
+                        value = editableLastName,
+                        onValueChange = { editableLastName = it },
+                        isEditing = editingFields.contains(field.key),
+                        onToggleEdit = { toggleEditField(editingFields, field.key) }
+                    )
+
+                    "username" -> EditableProfileField(
+                        label = field.label,
+                        value = editableUsername,
+                        onValueChange = { editableUsername = it },
+                        isEditing = editingFields.contains(field.key),
+                        onToggleEdit = { toggleEditField(editingFields, field.key) }
+                    )
+
+                    "email" -> EditableProfileField(
+                        label = field.label,
+                        value = editableEmail,
+                        onValueChange = { editableEmail = it },
+                        isEditing = editingFields.contains(field.key),
+                        onToggleEdit = { toggleEditField(editingFields, field.key) }
+                    )
+
+                    "phoneNumber" -> EditableProfileField(
+                        label = field.label,
+                        value = editablePhoneNumber,
+                        onValueChange = { editablePhoneNumber = it },
+                        isEditing = editingFields.contains(field.key),
+                        onToggleEdit = { toggleEditField(editingFields, field.key) }
                     )
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    Text(
-                        text = "General",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
+            item {
+                if (!profileStatusMessage.isNullOrBlank()) {
+                    PasswordStatusBox(
+                        message = profileStatusMessage!!,
+                        isSuccess = true
                     )
                 }
+            }
 
-                items(generalFields, key = { it.key }) { field ->
-                    when (field.key) {
-                        "firstName" -> EditableProfileField(
-                            label = field.label,
-                            value = editableFirstName,
-                            onValueChange = { editableFirstName = it },
-                            isEditing = editingFields.contains(field.key),
-                            onToggleEdit = {
-                                toggleEditField(editingFields, field.key)
-                            }
+            item {
+                Button(
+                    onClick = {
+                        onSaveProfile(
+                            editableFirstName.trim(),
+                            editableLastName.trim(),
+                            editableUsername.trim(),
+                            editableEmail.trim(),
+                            editablePhoneNumber.trim()
                         )
-
-                        "lastName" -> EditableProfileField(
-                            label = field.label,
-                            value = editableLastName,
-                            onValueChange = { editableLastName = it },
-                            isEditing = editingFields.contains(field.key),
-                            onToggleEdit = {
-                                toggleEditField(editingFields, field.key)
-                            }
-                        )
-
-                        "username" -> EditableProfileField(
-                            label = field.label,
-                            value = editableUsername,
-                            onValueChange = { editableUsername = it },
-                            isEditing = editingFields.contains(field.key),
-                            onToggleEdit = {
-                                toggleEditField(editingFields, field.key)
-                            }
-                        )
-
-                        "email" -> EditableProfileField(
-                            label = field.label,
-                            value = editableEmail,
-                            onValueChange = { editableEmail = it },
-                            isEditing = editingFields.contains(field.key),
-                            onToggleEdit = {
-                                toggleEditField(editingFields, field.key)
-                            }
-                        )
-
-                        "phoneNumber" -> EditableProfileField(
-                            label = field.label,
-                            value = editablePhoneNumber,
-                            onValueChange = { editablePhoneNumber = it },
-                            isEditing = editingFields.contains(field.key),
-                            onToggleEdit = {
-                                toggleEditField(editingFields, field.key)
-                            }
-                        )
-                    }
+                        editingFields.clear()
+                        profileStatusMessage = "Profile updated successfully."
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF1D5FB8),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Save Profile",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 }
+            }
 
-                item {
-                    if (!profileStatusMessage.isNullOrBlank()) {
+            item {
+                Text(
+                    text = "Security",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
+            item {
+                SecurityCard {
+                    PasswordInputField(
+                        label = "Current password",
+                        value = currentPassword,
+                        onValueChange = { currentPassword = it },
+                        visible = currentPasswordVisible,
+                        onToggleVisibility = { currentPasswordVisible = !currentPasswordVisible }
+                    )
+
+                    Spacer(modifier = Modifier.size(12.dp))
+
+                    PasswordInputField(
+                        label = "New password",
+                        value = newPassword,
+                        onValueChange = { newPassword = it },
+                        visible = newPasswordVisible,
+                        onToggleVisibility = { newPasswordVisible = !newPasswordVisible }
+                    )
+
+                    Spacer(modifier = Modifier.size(12.dp))
+
+                    PasswordInputField(
+                        label = "Confirm new password",
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it },
+                        visible = confirmPasswordVisible,
+                        onToggleVisibility = { confirmPasswordVisible = !confirmPasswordVisible }
+                    )
+
+                    Spacer(modifier = Modifier.size(16.dp))
+
+                    if (!visibleStatusMessage.isNullOrBlank()) {
                         PasswordStatusBox(
-                            message = profileStatusMessage!!,
-                            isSuccess = true
+                            message = visibleStatusMessage!!,
+                            isSuccess = isSuccessStatus
                         )
-                    }
-                }
 
-                item {
+                        Spacer(modifier = Modifier.size(14.dp))
+                    }
+
                     Button(
                         onClick = {
-                            onSaveProfile(
-                                editableFirstName.trim(),
-                                editableLastName.trim(),
-                                editableUsername.trim(),
-                                editableEmail.trim(),
-                                editablePhoneNumber.trim()
+                            onChangePassword(
+                                currentPassword,
+                                newPassword,
+                                confirmPassword
                             )
-                            editingFields.clear()
-                            profileStatusMessage = "Profile updated successfully."
                         },
+                        enabled = !isChangingPassword,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF1D5FB8),
-                            contentColor = Color.White
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF8DAEDB),
+                            disabledContentColor = Color.White
                         )
                     ) {
                         Text(
-                            text = "Save Profile",
+                            text = if (isChangingPassword) {
+                                "Changing password..."
+                            } else {
+                                "Change Password"
+                            },
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                    }
-                }
-
-                item {
-                    Text(
-                        text = "Security",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                item {
-                    SecurityCard {
-                        PasswordInputField(
-                            label = "Current password",
-                            value = currentPassword,
-                            onValueChange = { currentPassword = it },
-                            visible = currentPasswordVisible,
-                            onToggleVisibility = { currentPasswordVisible = !currentPasswordVisible }
-                        )
-
-                        Spacer(modifier = Modifier.size(12.dp))
-
-                        PasswordInputField(
-                            label = "New password",
-                            value = newPassword,
-                            onValueChange = { newPassword = it },
-                            visible = newPasswordVisible,
-                            onToggleVisibility = { newPasswordVisible = !newPasswordVisible }
-                        )
-
-                        Spacer(modifier = Modifier.size(12.dp))
-
-                        PasswordInputField(
-                            label = "Confirm new password",
-                            value = confirmPassword,
-                            onValueChange = { confirmPassword = it },
-                            visible = confirmPasswordVisible,
-                            onToggleVisibility = { confirmPasswordVisible = !confirmPasswordVisible }
-                        )
-
-                        Spacer(modifier = Modifier.size(16.dp))
-
-                        if (!visibleStatusMessage.isNullOrBlank()) {
-                            PasswordStatusBox(
-                                message = visibleStatusMessage!!,
-                                isSuccess = isSuccessStatus
-                            )
-
-                            Spacer(modifier = Modifier.size(14.dp))
-                        }
-
-                        Button(
-                            onClick = {
-                                onChangePassword(
-                                    currentPassword,
-                                    newPassword,
-                                    confirmPassword
-                                )
-                            },
-                            enabled = !isChangingPassword,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF1D5FB8),
-                                contentColor = Color.White,
-                                disabledContainerColor = Color(0xFF8DAEDB),
-                                disabledContentColor = Color.White
-                            )
-                        ) {
-                            Text(
-                                text = if (isChangingPassword) {
-                                    "Changing password..."
-                                } else {
-                                    "Change Password"
-                                },
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFFC62828))
-                            .clickable { onLogoutClick() }
-                            .padding(vertical = 16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Log Out",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            modifier = Modifier.padding(vertical = 6.dp)
                         )
                     }
                 }
             }
 
-            AppBottomNavBar(
-                selectedItem = BottomNavDestination.PROFILE,
-                onHomeClick = onHomeClick,
-                onMessagesClick = onMessagesClick,
-                onNotificationsClick = onNotificationsClick,
-                onProfileClick = onProfileClick
-            )
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFFC62828))
+                        .clickable { onLogoutClick() }
+                        .padding(vertical = 18.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Log Out",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
         }
+
+        AppBottomNavBar(
+            selectedItem = BottomNavDestination.PROFILE,
+            onHomeClick = onHomeClick,
+            onMessagesClick = onMessagesClick,
+            onNotificationsClick = onNotificationsClick,
+            onProfileClick = onProfileClick
+        )
     }
 }
 
@@ -455,7 +435,7 @@ private fun EditableProfileField(
         onValueChange = onValueChange,
         readOnly = !isEditing,
         singleLine = true,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         trailingIcon = {
             IconButton(onClick = onToggleEdit) {
                 Icon(
@@ -466,10 +446,10 @@ private fun EditableProfileField(
             }
         },
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color(0xFFF7F7F8),
-            unfocusedContainerColor = Color(0xFFF7F7F8),
-            disabledContainerColor = Color(0xFFF7F7F8),
-            focusedIndicatorColor = Color(0xFF1D5FB8),
+            focusedContainerColor = Color(0xFFF0F0F0),
+            unfocusedContainerColor = Color(0xFFF0F0F0),
+            disabledContainerColor = Color(0xFFF0F0F0),
+            focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent,
             focusedTextColor = Color.Black,
@@ -514,7 +494,7 @@ private fun PasswordInputField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         visualTransformation = if (visible) {
             VisualTransformation.None
         } else {

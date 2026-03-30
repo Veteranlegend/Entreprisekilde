@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AssignmentTurnedIn
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MailOutline
@@ -69,23 +68,12 @@ fun NotificationScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFFE0A673))
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 22.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Color.Black,
-                modifier = Modifier
-                    .size(24.dp)
-                    .clickable { onBack() }
-            )
-
-            Spacer(modifier = Modifier.size(12.dp))
-
             Text(
                 text = "Notifications",
-                fontSize = 26.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
@@ -94,7 +82,7 @@ fun NotificationScreen(
 
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(60.dp)
                     .background(Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -102,7 +90,7 @@ fun NotificationScreen(
                     imageVector = Icons.Outlined.Inventory2,
                     contentDescription = "Notifications",
                     tint = Color(0xFF666666),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
         }
@@ -227,7 +215,11 @@ private fun NotificationCard(
             modifier = Modifier
                 .size(46.dp)
                 .background(
-                    color = if (notification.type == NotificationType.MESSAGE) Color(0xFFB7DDFC) else Color(0xFFD8EACF),
+                    color = if (notification.type == NotificationType.MESSAGE) {
+                        Color(0xFFB7DDFC)
+                    } else {
+                        Color(0xFFD8EACF)
+                    },
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center

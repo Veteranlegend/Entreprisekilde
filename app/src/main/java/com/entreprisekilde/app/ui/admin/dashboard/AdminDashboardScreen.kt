@@ -7,16 +7,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -54,18 +56,18 @@ fun AdminDashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
-            .statusBarsPadding()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFFE0A673))
-                .padding(horizontal = 20.dp, vertical = 18.dp),
+                .padding(horizontal = 24.dp, vertical = 22.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Dashboard",
-                fontSize = 28.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
@@ -74,7 +76,7 @@ fun AdminDashboardScreen(
 
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(60.dp)
                     .background(Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -82,7 +84,7 @@ fun AdminDashboardScreen(
                     imageVector = Icons.Outlined.GridView,
                     contentDescription = "Dashboard",
                     tint = Color(0xFF666666),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
         }

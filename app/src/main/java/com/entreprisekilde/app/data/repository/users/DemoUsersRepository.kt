@@ -72,6 +72,20 @@ class DemoUsersRepository : UserRepository {
         )
     )
 
+
+    override suspend fun deleteUser(userId: String): Result<Unit> {
+        val userToRemove = users.firstOrNull { it.id == userId }
+            ?: return Result.failure(Exception("User not found."))
+
+        users.remove(userToRemove)
+
+        if (currentLoggedInUser?.id == userId) {
+            currentLoggedInUser = null
+            authObserver?.invoke(null)
+        }
+
+        return Result.success(Unit)
+    }
     override suspend fun getUsers(): List<User> {
         return users.toList()
     }

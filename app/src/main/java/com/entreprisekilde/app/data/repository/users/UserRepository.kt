@@ -30,6 +30,7 @@ interface UserRepository {
     ): Result<Unit>
 
     suspend fun updateUser(updatedUser: User): Result<Unit>
+    suspend fun deleteUser(userId: String): Result<Unit>
 
     suspend fun changeOwnPassword(
         currentPassword: String,
