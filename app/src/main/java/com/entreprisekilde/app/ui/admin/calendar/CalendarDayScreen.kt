@@ -1,4 +1,3 @@
-
 package com.entreprisekilde.app.ui.admin.calendar
 
 import androidx.compose.foundation.background
@@ -45,6 +44,10 @@ import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 @Composable
 fun CalendarDayScreen(
@@ -288,21 +291,20 @@ private fun taskStatusLabel(status: TaskStatus): String {
 }
 
 private fun prettyDate(date: String): String {
-    return try {
-        val parsed = java.time.LocalDate.parse(
-            date,
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
-        )
-        val dayName = parsed.dayOfWeek.getDisplayName(
-            java.time.format.TextStyle.FULL,
-            java.util.Locale.ENGLISH
-        )
-        val monthName = parsed.month.getDisplayName(
-            java.time.format.TextStyle.FULL,
-            java.util.Locale.ENGLISH
-        )
-        "$dayName ${parsed.dayOfMonth} $monthName ${parsed.year}"
-    } catch (_: Exception) {
-        date
+    val supportedFormats = listOf(
+        DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    )
+
+    for (formatter in supportedFormats) {
+        try {
+            val parsed = LocalDate.parse(date, formatter)
+            val dayName = parsed.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+            val monthName = parsed.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+            return "$dayName ${parsed.dayOfMonth} $monthName ${parsed.year}"
+        } catch (_: Exception) {
+        }
     }
+
+    return date
 }

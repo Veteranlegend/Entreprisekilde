@@ -1,20 +1,24 @@
 package com.entreprisekilde.app.ui.admin.tasks
 
-import android.content.Intent
-import android.net.Uri
+import android.app.DatePickerDialog
+import android.widget.DatePicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,8 +26,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -32,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,9 +51,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.entreprisekilde.app.data.model.task.TaskData
-import com.entreprisekilde.app.data.model.task.TaskStatus
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun TaskDetailsScreen(
@@ -62,29 +69,72 @@ fun TaskDetailsScreen(
     onProfileClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val displayFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
     var customer by remember(task.id) { mutableStateOf(task.customer) }
     var phoneNumber by remember(task.id) { mutableStateOf(task.phoneNumber) }
     var address by remember(task.id) { mutableStateOf(task.address) }
-    var date by remember(task.id) { mutableStateOf(task.date) }
-    var taskDetails by remember(task.id) { mutableStateOf(task.taskDetails) }
+    var date by remember(task.id) { mutableStateOf(normalizeDateForDisplay(task.date)) }
     var assignTo by remember(task.id) { mutableStateOf(task.assignTo) }
-    var status by remember(task.id) { mutableStateOf(task.status) }
+    var taskDetails by remember(task.id) { mutableStateOf(task.taskDetails) }
+    var assignToExpanded by remember { mutableStateOf(false) }
+    var showSavedDialog by remember { mutableStateOf(false) }
 
-    var assignedExpanded by remember { mutableStateOf(false) }
-    var statusExpanded by remember { mutableStateOf(false) }
+    val initialDate = parseToLocalDate(date) ?: LocalDate.now()
+
+    val datePickerDialog = remember(initialDate) {
+        DatePickerDialog(
+            context,
+            { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
+                val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
+                date = selectedDate.format(displayFormatter)
+            },
+            initialDate.year,
+            initialDate.monthValue - 1,
+            initialDate.dayOfMonth
+        ).apply {
+            try {
+                datePicker.calendarViewShown = true
+                datePicker.spinnersShown = false
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    if (showSavedDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showSavedDialog = false
+            },
+            title = {
+                Text("Changes saved")
+            },
+            text = {
+                Text("The task details were updated successfully.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSavedDialog = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
-            .statusBarsPadding()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFFE0A673))
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -96,27 +146,11 @@ fun TaskDetailsScreen(
                     .clickable { onBack() }
             )
 
-            Spacer(modifier = Modifier.size(12.dp))
-
-            Box(
-                modifier = Modifier
-                    .size(58.dp)
-                    .background(Color(0xFF8EC5FF), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = customer.take(1).uppercase(),
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Text(
-                text = customer.ifBlank { "Task Details" },
-                fontSize = 22.sp,
+                text = "Task Details",
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
@@ -131,7 +165,7 @@ fun TaskDetailsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Description,
-                    contentDescription = null,
+                    contentDescription = "Task details",
                     tint = Color(0xFF666666),
                     modifier = Modifier.size(22.dp)
                 )
@@ -141,306 +175,278 @@ fun TaskDetailsScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
+            SmallField(
+                label = "Customer",
+                value = customer,
+                onValueChange = { customer = it }
+            )
+
+            SmallField(
+                label = "Phone Number",
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it }
+            )
+
+            SmallField(
+                label = "Address",
+                value = address,
+                onValueChange = { address = it }
+            )
+
+            DateSelectorField(
+                label = "Date",
+                value = date,
+                onClick = { datePickerDialog.show() }
+            )
+
+            AssignToSelectorField(
+                label = "Assign To",
+                value = assignTo,
+                options = assignedUserOptions,
+                expanded = assignToExpanded,
+                onExpand = { assignToExpanded = true },
+                onDismiss = { assignToExpanded = false },
+                onSelect = { selectedUser ->
+                    assignTo = selectedUser
+                    assignToExpanded = false
+                }
+            )
+
+            SmallField(
+                label = "Task Details",
+                value = taskDetails,
+                onValueChange = { taskDetails = it },
+                singleLine = false,
+                minLines = 4
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    onSaveEdit(
+                        task.copy(
+                            customer = customer.trim(),
+                            phoneNumber = phoneNumber.trim(),
+                            address = address.trim(),
+                            date = normalizeDateForDisplay(date),
+                            assignTo = assignTo.trim(),
+                            taskDetails = taskDetails.trim()
+                        )
+                    )
+                    showSavedDialog = true
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF1F1F1), RoundedCornerShape(24.dp))
-                    .padding(20.dp)
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    EditableField(
-                        label = "Customer",
-                        value = customer,
-                        onValueChange = { customer = it }
-                    )
-
-                    EditableField(
-                        label = "Phone Number",
-                        value = phoneNumber,
-                        onValueChange = { phoneNumber = it }
-                    )
-
-                    AddressField(
-                        value = address,
-                        onValueChange = { address = it },
-                        onOpenMaps = {
-                            val trimmedAddress = address.trim()
-                            if (trimmedAddress.isNotEmpty()) {
-                                val gmmIntentUri = Uri.parse("geo:0,0?q=${Uri.encode(trimmedAddress)}")
-                                val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                                context.startActivity(mapIntent)
-                            }
-                        }
-                    )
-
-                    EditableField(
-                        label = "Date",
-                        value = date,
-                        onValueChange = { date = it }
-                    )
-
-                    EditableField(
-                        label = "Task Details",
-                        value = taskDetails,
-                        onValueChange = { taskDetails = it },
-                        singleLine = false,
-                        minLines = 4
-                    )
-
-                    Column {
-                        Text(
-                            text = "Assigned to",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF444444)
-                        )
-
-                        Spacer(modifier = Modifier.size(6.dp))
-
-                        if (assignedUserOptions.isNotEmpty()) {
-                            Box {
-                                DropdownField(
-                                    value = assignTo,
-                                    onClick = { assignedExpanded = true }
-                                )
-
-                                DropdownMenu(
-                                    expanded = assignedExpanded,
-                                    onDismissRequest = { assignedExpanded = false }
-                                ) {
-                                    assignedUserOptions.forEach { userName ->
-                                        DropdownMenuItem(
-                                            text = { Text(userName) },
-                                            onClick = {
-                                                assignTo = userName
-                                                assignedExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            EditableField(
-                                label = "",
-                                value = assignTo,
-                                onValueChange = { assignTo = it },
-                                showLabel = false
-                            )
-                        }
-                    }
-
-                    Column {
-                        Text(
-                            text = "Status",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF444444)
-                        )
-
-                        Spacer(modifier = Modifier.size(6.dp))
-
-                        Box {
-                            DropdownField(
-                                value = taskStatusLabel(status),
-                                onClick = { statusExpanded = true }
-                            )
-
-                            DropdownMenu(
-                                expanded = statusExpanded,
-                                onDismissRequest = { statusExpanded = false }
-                            ) {
-                                listOf(
-                                    TaskStatus.PENDING,
-                                    TaskStatus.IN_PROGRESS,
-                                    TaskStatus.COMPLETED
-                                ).forEach { value ->
-                                    DropdownMenuItem(
-                                        text = { Text(taskStatusLabel(value)) },
-                                        onClick = {
-                                            status = value
-                                            statusExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.size(8.dp))
-
-                    Button(
-                        onClick = {
-                            onSaveEdit(
-                                task.copy(
-                                    customer = customer,
-                                    phoneNumber = phoneNumber,
-                                    address = address,
-                                    date = date,
-                                    taskDetails = taskDetails,
-                                    assignTo = assignTo,
-                                    status = status
-                                )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF79A7D8),
-                            contentColor = Color.Black
-                        )
-                    ) {
-                        Text(
-                            text = "Save Changes",
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-        }
-
-        Box(modifier = Modifier.navigationBarsPadding()) {
-            AppBottomNavBar(
-                selectedItem = BottomNavDestination.HOME,
-                unreadNotificationCount = unreadNotificationCount,
-                onHomeClick = onHomeClick,
-                onMessagesClick = onMessagesClick,
-                onNotificationsClick = onNotificationsClick,
-                onProfileClick = onProfileClick
-            )
-        }
-    }
-}
-
-@Composable
-private fun EditableField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    singleLine: Boolean = true,
-    minLines: Int = 1,
-    showLabel: Boolean = true
-) {
-    Column {
-        if (showLabel && label.isNotBlank()) {
-            Text(
-                text = label,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF444444)
-            )
-
-            Spacer(modifier = Modifier.size(6.dp))
-        }
-
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = singleLine,
-            minLines = minLines,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
-            )
-        )
-    }
-}
-
-@Composable
-private fun AddressField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onOpenMaps: () -> Unit
-) {
-    Column {
-        Text(
-            text = "Address",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF444444)
-        )
-
-        Spacer(modifier = Modifier.size(6.dp))
-
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
-            )
-        )
-
-        if (value.trim().isNotEmpty()) {
-            Spacer(modifier = Modifier.size(8.dp))
-
-            Row(
-                modifier = Modifier
-                    .clickable { onOpenMaps() }
-                    .padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.LocationOn,
-                    contentDescription = "Open in Maps",
-                    tint = Color(0xFF2F6DB3),
-                    modifier = Modifier.size(18.dp)
+                    .height(54.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFCFE0D0),
+                    contentColor = Color(0xFF3F6E48)
                 )
-
-                Spacer(modifier = Modifier.size(6.dp))
-
+            ) {
                 Text(
-                    text = "Open in Maps",
-                    color = Color(0xFF2F6DB3),
-                    fontSize = 14.sp,
+                    text = "Save",
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
         }
+
+        AppBottomNavBar(
+            selectedItem = BottomNavDestination.HOME,
+            unreadNotificationCount = unreadNotificationCount,
+            onHomeClick = onHomeClick,
+            onMessagesClick = onMessagesClick,
+            onNotificationsClick = onNotificationsClick,
+            onProfileClick = onProfileClick
+        )
     }
 }
 
 @Composable
-private fun DropdownField(
+private fun SmallField(
+    label: String,
     value: String,
-    onClick: () -> Unit
+    onValueChange: (String) -> Unit,
+    singleLine: Boolean = true,
+    minLines: Int = 1
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(6.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Text(
-            text = value,
-            color = Color.Black,
-            fontSize = 16.sp
+            text = label,
+            color = Color(0xFF444444),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        Icon(
-            imageVector = Icons.Outlined.ArrowDropDown,
-            contentDescription = "Open dropdown",
-            tint = Color(0xFF666666)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = singleLine,
+            minLines = minLines,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = Color(0xFF9AA0A6),
+                unfocusedBorderColor = Color(0xFF9AA0A6),
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black
+            )
         )
     }
 }
 
-private fun taskStatusLabel(status: TaskStatus): String {
-    return when (status) {
-        TaskStatus.PENDING -> "Pending"
-        TaskStatus.IN_PROGRESS -> "In Progress"
-        TaskStatus.COMPLETED -> "Completed"
+@Composable
+private fun DateSelectorField(
+    label: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            color = Color(0xFF444444),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarToday,
+                        contentDescription = "Select date",
+                        tint = Color(0xFF666666)
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = Color(0xFF9AA0A6),
+                    unfocusedBorderColor = Color(0xFF9AA0A6),
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                )
+            )
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onClick() }
+            )
+        }
     }
+}
+
+@Composable
+private fun AssignToSelectorField(
+    label: String,
+    value: String,
+    options: List<String>,
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            color = Color(0xFF444444),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.ArrowDropDown,
+                        contentDescription = "Open employee list",
+                        tint = Color(0xFF666666)
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = Color(0xFF9AA0A6),
+                    unfocusedBorderColor = Color(0xFF9AA0A6),
+                    focusedTextColor = Color.Black,
+                    unfocusedTextColor = Color.Black
+                )
+            )
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onExpand() }
+            )
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = onDismiss
+            ) {
+                options.forEach { userName ->
+                    DropdownMenuItem(
+                        text = { Text(userName) },
+                        onClick = { onSelect(userName) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun parseToLocalDate(date: String): LocalDate? {
+    val inputFormats = listOf(
+        DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    )
+
+    for (formatter in inputFormats) {
+        try {
+            return LocalDate.parse(date, formatter)
+        } catch (_: Exception) {
+        }
+    }
+
+    return null
+}
+
+private fun normalizeDateForDisplay(date: String): String {
+    val parsed = parseToLocalDate(date) ?: return date
+    return parsed.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
 }

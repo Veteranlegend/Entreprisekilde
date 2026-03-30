@@ -1,6 +1,6 @@
 package com.entreprisekilde.app.data.model.users
 
-data class EmployeeUser(
+data class User(
     val id: String = "",
     val firstName: String = "",
     val lastName: String = "",

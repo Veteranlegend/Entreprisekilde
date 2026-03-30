@@ -1,15 +1,15 @@
 package com.entreprisekilde.app.data.repository.users
 
 import com.entreprisekilde.app.data.model.auth.LoginResult
-import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.User
 
 interface UserRepository {
 
-    suspend fun getUsers(): List<EmployeeUser>
+    suspend fun getUsers(): List<User>
 
     suspend fun login(username: String, password: String): LoginResult
 
-    suspend fun getUserById(userId: String): EmployeeUser?
+    suspend fun getUserById(userId: String): User?
 
     fun getCurrentAuthUserId(): String?
 
@@ -25,10 +25,11 @@ interface UserRepository {
         email: String,
         phoneNumber: String,
         username: String,
-        password: String
+        password: String,
+        role: String
     ): Result<Unit>
 
-    suspend fun updateUser(updatedUser: EmployeeUser): Result<Unit>
+    suspend fun updateUser(updatedUser: User): Result<Unit>
 
     suspend fun changeOwnPassword(
         currentPassword: String,

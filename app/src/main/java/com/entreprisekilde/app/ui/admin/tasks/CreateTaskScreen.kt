@@ -52,9 +52,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
-import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.User
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
 @Composable
@@ -62,7 +64,7 @@ fun CreateTaskScreen(
     unreadNotificationCount: Int = 0,
     onBack: () -> Unit = {},
     onCreateTask: (TaskData) -> Unit = {},
-    assignedUserOptions: List<EmployeeUser> = emptyList(),
+    assignedUserOptions: List<User> = emptyList(),
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
@@ -85,14 +87,14 @@ fun CreateTaskScreen(
     val buttonTextColor = Color(0xFF3F6E48)
 
     val calendar = remember { Calendar.getInstance() }
+    val displayFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
     val datePickerDialog = remember {
         DatePickerDialog(
             context,
             { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
-                val formattedMonth = (month + 1).toString().padStart(2, '0')
-                val formattedDay = dayOfMonth.toString().padStart(2, '0')
-                date = "$year-$formattedMonth-$formattedDay"
+                val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
+                date = selectedDate.format(displayFormatter)
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
@@ -384,11 +386,11 @@ private fun DateSelectorField(
 private fun AssignToSelectorField(
     label: String,
     value: String,
-    options: List<EmployeeUser>,
+    options: List<User>,
     expanded: Boolean,
     onExpand: () -> Unit,
     onDismiss: () -> Unit,
-    onSelect: (EmployeeUser) -> Unit
+    onSelect: (User) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(

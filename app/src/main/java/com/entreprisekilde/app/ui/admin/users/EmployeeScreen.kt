@@ -1,5 +1,5 @@
 package com.entreprisekilde.app.ui.admin.users
-import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.User
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,10 +51,10 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun EmployeeScreen(
-    users: List<EmployeeUser>,
+    users: List<User>,
     onBack: () -> Unit = {},
     onCreateUserClick: () -> Unit = {},
-    onUserClick: (EmployeeUser) -> Unit = {},
+    onUserClick: (User) -> Unit = {},
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
@@ -231,7 +231,7 @@ fun EmployeeScreen(
 
 @Composable
 private fun UserCard(
-    user: EmployeeUser,
+    user: User,
     onClick: () -> Unit
 ) {
     Row(

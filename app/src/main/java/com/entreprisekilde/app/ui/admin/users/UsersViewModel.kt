@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.entreprisekilde.app.data.model.auth.LoginResult
-import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.User
 import com.entreprisekilde.app.data.repository.users.UserRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -16,12 +16,12 @@ class UsersViewModel(
     private val userRepository: UserRepository
 ) : ViewModel() {
 
-    val users = mutableStateListOf<EmployeeUser>()
+    val users = mutableStateListOf<User>()
 
-    var selectedUser by mutableStateOf<EmployeeUser?>(null)
+    var selectedUser by mutableStateOf<User?>(null)
         private set
 
-    var loggedInUser by mutableStateOf<EmployeeUser?>(null)
+    var loggedInUser by mutableStateOf<User?>(null)
         private set
 
     var isCheckingAuth by mutableStateOf(true)
@@ -207,7 +207,7 @@ class UsersViewModel(
         clearChangePasswordMessages()
     }
 
-    fun selectUser(user: EmployeeUser) {
+    fun selectUser(user: User) {
         selectedUser = user
     }
 
@@ -231,7 +231,8 @@ class UsersViewModel(
         email: String,
         phoneNumber: String,
         username: String,
-        password: String
+        password: String,
+        role: String
     ) {
         viewModelScope.launch {
             clearCreateUserMessages()
@@ -242,7 +243,8 @@ class UsersViewModel(
                 email = email,
                 phoneNumber = phoneNumber,
                 username = username,
-                password = password
+                password = password,
+                role = role
             )
 
             result
@@ -256,7 +258,7 @@ class UsersViewModel(
         }
     }
 
-    fun updateUser(updatedUser: EmployeeUser) {
+    fun updateUser(updatedUser: User) {
         viewModelScope.launch {
             clearUpdateUserMessages()
 

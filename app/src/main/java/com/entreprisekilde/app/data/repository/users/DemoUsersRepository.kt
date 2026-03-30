@@ -1,16 +1,16 @@
 package com.entreprisekilde.app.data.repository.users
 
 import com.entreprisekilde.app.data.model.auth.LoginResult
-import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.User
 
 class DemoUsersRepository : UserRepository {
 
     private var nextId = 7
-    private var currentLoggedInUser: EmployeeUser? = null
+    private var currentLoggedInUser: User? = null
     private var authObserver: ((String?) -> Unit)? = null
 
     private val users = mutableListOf(
-        EmployeeUser(
+        User(
             id = "1",
             firstName = "Rasmus",
             lastName = "Jensen",
@@ -20,7 +20,7 @@ class DemoUsersRepository : UserRepository {
             password = "1234",
             role = "employee"
         ),
-        EmployeeUser(
+        User(
             id = "2",
             firstName = "Tomas",
             lastName = "Larsen",
@@ -30,7 +30,7 @@ class DemoUsersRepository : UserRepository {
             password = "1234",
             role = "admin"
         ),
-        EmployeeUser(
+        User(
             id = "3",
             firstName = "Peter",
             lastName = "Hansen",
@@ -40,7 +40,7 @@ class DemoUsersRepository : UserRepository {
             password = "1234",
             role = "employee"
         ),
-        EmployeeUser(
+        User(
             id = "4",
             firstName = "John",
             lastName = "Miller",
@@ -50,7 +50,7 @@ class DemoUsersRepository : UserRepository {
             password = "1234",
             role = "employee"
         ),
-        EmployeeUser(
+        User(
             id = "5",
             firstName = "Ahmad",
             lastName = "El Haj",
@@ -60,7 +60,7 @@ class DemoUsersRepository : UserRepository {
             password = "1234",
             role = "employee"
         ),
-        EmployeeUser(
+        User(
             id = "6",
             firstName = "Lars",
             lastName = "Nielsen",
@@ -72,7 +72,7 @@ class DemoUsersRepository : UserRepository {
         )
     )
 
-    override suspend fun getUsers(): List<EmployeeUser> {
+    override suspend fun getUsers(): List<User> {
         return users.toList()
     }
 
@@ -97,7 +97,7 @@ class DemoUsersRepository : UserRepository {
         }
     }
 
-    override suspend fun getUserById(userId: String): EmployeeUser? {
+    override suspend fun getUserById(userId: String): User? {
         return users.firstOrNull { it.id == userId }
     }
 
@@ -125,9 +125,10 @@ class DemoUsersRepository : UserRepository {
         email: String,
         phoneNumber: String,
         username: String,
-        password: String
+        password: String,
+        role: String
     ): Result<Unit> {
-        val newUser = EmployeeUser(
+        val newUser = User(
             id = nextId.toString(),
             firstName = firstName,
             lastName = lastName,
@@ -135,7 +136,7 @@ class DemoUsersRepository : UserRepository {
             phoneNumber = phoneNumber,
             username = username,
             password = password,
-            role = "employee"
+            role = role
         )
 
         nextId++
@@ -144,7 +145,7 @@ class DemoUsersRepository : UserRepository {
         return Result.success(Unit)
     }
 
-    override suspend fun updateUser(updatedUser: EmployeeUser): Result<Unit> {
+    override suspend fun updateUser(updatedUser: User): Result<Unit> {
         val index = users.indexOfFirst { it.id == updatedUser.id }
 
         return if (index != -1) {
@@ -154,6 +155,7 @@ class DemoUsersRepository : UserRepository {
             Result.failure(Exception("User not found"))
         }
     }
+
     override suspend fun changeOwnPassword(
         currentPassword: String,
         newPassword: String
@@ -165,4 +167,3 @@ class DemoUsersRepository : UserRepository {
         }
     }
 }
-

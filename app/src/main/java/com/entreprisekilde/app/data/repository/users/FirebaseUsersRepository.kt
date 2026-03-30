@@ -1,7 +1,7 @@
 package com.entreprisekilde.app.data.repository.users
 
 import com.entreprisekilde.app.data.model.auth.LoginResult
-import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.User
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.FirebaseTooManyRequestsException
@@ -50,7 +50,7 @@ class FirebaseUsersRepository : UserRepository {
                 val user = if (userDoc.exists()) {
                     documentToEmployeeUser(userDoc)
                 } else {
-                    EmployeeUser(
+                    User(
                         id = firebaseUid,
                         firstName = "",
                         lastName = "",
@@ -64,7 +64,6 @@ class FirebaseUsersRepository : UserRepository {
 
                 LoginResult.Success(user)
             } else {
-                // Username is now case-sensitive
                 val cleanUsername = cleanInput
 
                 val usernameQuerySnapshot = firestore.collection("users")
@@ -95,7 +94,7 @@ class FirebaseUsersRepository : UserRepository {
                 val user = if (latestUserDoc.exists()) {
                     documentToEmployeeUser(latestUserDoc)
                 } else {
-                    EmployeeUser(
+                    User(
                         id = firebaseUid,
                         firstName = matchedDoc.getString("firstName")?.trim().orEmpty(),
                         lastName = matchedDoc.getString("lastName")?.trim().orEmpty(),
@@ -124,7 +123,7 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
-    override suspend fun getUserById(userId: String): EmployeeUser? {
+    override suspend fun getUserById(userId: String): User? {
         return try {
             val directDoc = firestore.collection("users")
                 .document(userId)
@@ -169,7 +168,7 @@ class FirebaseUsersRepository : UserRepository {
         auth.signOut()
     }
 
-    override suspend fun getUsers(): List<EmployeeUser> {
+    override suspend fun getUsers(): List<User> {
         return try {
             val snapshot = firestore.collection("users").get().await()
             snapshot.documents.map { documentToEmployeeUser(it) }
@@ -185,7 +184,8 @@ class FirebaseUsersRepository : UserRepository {
         email: String,
         phoneNumber: String,
         username: String,
-        password: String
+        password: String,
+        role: String
     ): Result<Unit> {
         var secondaryApp: FirebaseApp? = null
 
@@ -196,6 +196,7 @@ class FirebaseUsersRepository : UserRepository {
             val cleanPhoneNumber = phoneNumber.trim()
             val cleanUsername = username.trim()
             val cleanPassword = password.trim()
+            val cleanRole = role.trim().ifBlank { "employee" }
 
             val usernameQuerySnapshot = firestore.collection("users")
                 .whereEqualTo("username", cleanUsername)
@@ -229,7 +230,7 @@ class FirebaseUsersRepository : UserRepository {
             val uid = result.user?.uid
                 ?: return Result.failure(Exception("Failed to create auth user."))
 
-            val user = EmployeeUser(
+            val user = User(
                 id = uid,
                 firstName = cleanFirstName,
                 lastName = cleanLastName,
@@ -237,7 +238,7 @@ class FirebaseUsersRepository : UserRepository {
                 phoneNumber = cleanPhoneNumber,
                 username = cleanUsername,
                 password = "",
-                role = "employee"
+                role = cleanRole
             )
 
             firestore.collection("users")
@@ -256,7 +257,7 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
-    override suspend fun updateUser(updatedUser: EmployeeUser): Result<Unit> {
+    override suspend fun updateUser(updatedUser: User): Result<Unit> {
         return try {
             val cleanUsername = updatedUser.username.trim()
 
@@ -327,8 +328,8 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
-    private fun documentToEmployeeUser(doc: DocumentSnapshot): EmployeeUser {
-        return EmployeeUser(
+    private fun documentToEmployeeUser(doc: DocumentSnapshot): User {
+        return User(
             id = doc.get("id")?.toString()?.trim().orEmpty().ifBlank { doc.id },
             firstName = doc.get("firstName")?.toString()?.trim().orEmpty(),
             lastName = doc.get("lastName")?.toString()?.trim().orEmpty(),

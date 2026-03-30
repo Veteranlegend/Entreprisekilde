@@ -48,13 +48,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.entreprisekilde.app.data.model.users.EmployeeUser
+import com.entreprisekilde.app.data.model.users.User
 
 @Composable
 fun UserDetailsScreen(
-    user: EmployeeUser,
+    user: User,
     onBack: () -> Unit = {},
-    onSaveUser: (EmployeeUser) -> Unit = {},
+    onSaveUser: (User) -> Unit = {},
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},

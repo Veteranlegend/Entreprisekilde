@@ -1,4 +1,3 @@
-
 package com.entreprisekilde.app.ui.admin.calendar
 
 import androidx.compose.foundation.background
@@ -58,7 +57,7 @@ fun CalendarScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
-    var currentMonth by remember { mutableStateOf(YearMonth.of(2026, 3)) }
+    var currentMonth by remember { mutableStateOf(YearMonth.now()) }
 
     val taskDates = remember(tasks) {
         tasks.mapNotNull { task ->
@@ -277,11 +276,19 @@ fun CalendarScreen(
 }
 
 private fun parseTaskDate(date: String): LocalDate? {
-    return try {
-        LocalDate.parse(date, DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-    } catch (_: Exception) {
-        null
+    val supportedFormats = listOf(
+        DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    )
+
+    for (formatter in supportedFormats) {
+        try {
+            return LocalDate.parse(date, formatter)
+        } catch (_: Exception) {
+        }
     }
+
+    return null
 }
 
 private fun formatDateForTask(date: LocalDate): String {
