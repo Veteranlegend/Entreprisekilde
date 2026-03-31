@@ -1,6 +1,9 @@
 package com.entreprisekilde.app.ui.admin.tasks
 
 import android.app.DatePickerDialog
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.widget.DatePicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -79,6 +83,7 @@ fun TaskDetailsScreen(
     var taskDetails by remember(task.id) { mutableStateOf(task.taskDetails) }
     var assignToExpanded by remember { mutableStateOf(false) }
     var showSavedDialog by remember { mutableStateOf(false) }
+    var showMapsErrorDialog by remember { mutableStateOf(false) }
 
     val initialDate = parseToLocalDate(date) ?: LocalDate.now()
 
@@ -116,6 +121,29 @@ fun TaskDetailsScreen(
                 TextButton(
                     onClick = {
                         showSavedDialog = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    if (showMapsErrorDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showMapsErrorDialog = false
+            },
+            title = {
+                Text("Unable to open maps")
+            },
+            text = {
+                Text("No maps application was found on this device.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showMapsErrorDialog = false
                     }
                 ) {
                     Text("OK")
@@ -197,6 +225,61 @@ fun TaskDetailsScreen(
                 value = address,
                 onValueChange = { address = it }
             )
+
+            Button(
+                onClick = {
+                    val cleanAddress = address.trim()
+
+                    if (cleanAddress.isBlank()) return@Button
+
+                    val encodedAddress = Uri.encode(cleanAddress)
+
+                    val mapsIntent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("geo:0,0?q=$encodedAddress")
+                    )
+
+                    try {
+                        context.startActivity(mapsIntent)
+                    } catch (_: ActivityNotFoundException) {
+                        try {
+                            val browserFallbackIntent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://www.google.com/maps/search/?api=1&query=$encodedAddress")
+                            )
+                            context.startActivity(browserFallbackIntent)
+                        } catch (_: Exception) {
+                            showMapsErrorDialog = true
+                        }
+                    }
+
+                },
+                enabled = address.trim().isNotBlank(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFE6EEF8),
+                    contentColor = Color(0xFF214C7A),
+                    disabledContainerColor = Color(0xFFEAEAEA),
+                    disabledContentColor = Color(0xFF9E9E9E)
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.LocationOn,
+                    contentDescription = "Open in Maps",
+                    modifier = Modifier.size(20.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "Open in Maps",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
 
             DateSelectorField(
                 label = "Date",

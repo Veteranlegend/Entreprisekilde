@@ -83,28 +83,72 @@ object DemoSeedData {
                 recipientId = "boss",
                 recipientName = "Boss",
                 lastMessage = "Can you work 2 hours extra today?",
-                unreadCount = 2
+                unreadCount = 2,
+                participantIds = listOf("me", "boss"),
+                participantNames = mapOf(
+                    "me" to "Me",
+                    "boss" to "Boss"
+                ),
+                unreadCountByUser = mapOf(
+                    "me" to 2,
+                    "boss" to 0
+                ),
+                updatedAt = 1L,
+                lastMessageSenderId = "boss"
             ),
             MessageThread(
                 id = 2,
                 recipientId = "support_team",
                 recipientName = "Support Team",
                 lastMessage = "Try to call John before arriving.",
-                unreadCount = 1
+                unreadCount = 1,
+                participantIds = listOf("me", "support_team"),
+                participantNames = mapOf(
+                    "me" to "Me",
+                    "support_team" to "Support Team"
+                ),
+                unreadCountByUser = mapOf(
+                    "me" to 1,
+                    "support_team" to 0
+                ),
+                updatedAt = 2L,
+                lastMessageSenderId = "support_team"
             ),
             MessageThread(
                 id = 3,
                 recipientId = "shift_planner",
                 recipientName = "Shift Planner",
                 lastMessage = "There is 1 extra shift available tomorrow.",
-                unreadCount = 0
+                unreadCount = 0,
+                participantIds = listOf("me", "shift_planner"),
+                participantNames = mapOf(
+                    "me" to "Me",
+                    "shift_planner" to "Shift Planner"
+                ),
+                unreadCountByUser = mapOf(
+                    "me" to 0,
+                    "shift_planner" to 0
+                ),
+                updatedAt = 3L,
+                lastMessageSenderId = "shift_planner"
             ),
             MessageThread(
                 id = 4,
                 recipientId = "john_miller",
                 recipientName = "John Miller",
                 lastMessage = "I finished the task at the customer site.",
-                unreadCount = 0
+                unreadCount = 0,
+                participantIds = listOf("me", "john_miller"),
+                participantNames = mapOf(
+                    "me" to "Me",
+                    "john_miller" to "John Miller"
+                ),
+                unreadCountByUser = mapOf(
+                    "me" to 0,
+                    "john_miller" to 0
+                ),
+                updatedAt = 4L,
+                lastMessageSenderId = "john_miller"
             )
         )
     }
@@ -113,70 +157,87 @@ object DemoSeedData {
         return mapOf(
             1 to listOf(
                 ChatMessage(
-                    id = 1,
+                    id = "1",
                     threadId = 1,
                     senderId = "boss",
                     text = "Can you work 2 hours extra today?",
-                    time = "09:10"
+                    time = "09:10",
+                    createdAt = 1L,
+                    readByUserIds = listOf("boss")
                 ),
                 ChatMessage(
-                    id = 2,
+                    id = "2",
                     threadId = 1,
                     senderId = "me",
                     text = "Yes, that is fine for me.",
-                    time = "09:12"
+                    time = "09:12",
+                    createdAt = 2L,
+                    readByUserIds = listOf("me", "boss")
                 ),
                 ChatMessage(
-                    id = 3,
+                    id = "3",
                     threadId = 1,
                     senderId = "boss",
                     text = "Perfect, thank you.",
-                    time = "09:13"
+                    time = "09:13",
+                    createdAt = 3L,
+                    readByUserIds = listOf("boss")
                 )
             ),
             2 to listOf(
                 ChatMessage(
-                    id = 4,
+                    id = "4",
                     threadId = 2,
                     senderId = "support_team",
                     text = "Try to call John before arriving.",
-                    time = "08:45"
+                    time = "08:45",
+                    createdAt = 4L,
+                    readByUserIds = listOf("support_team")
                 ),
                 ChatMessage(
-                    id = 5,
+                    id = "5",
                     threadId = 2,
                     senderId = "me",
                     text = "Okay, I will do that.",
-                    time = "08:47"
+                    time = "08:47",
+                    createdAt = 5L,
+                    readByUserIds = listOf("me", "support_team")
                 )
             ),
             3 to listOf(
                 ChatMessage(
-                    id = 6,
+                    id = "6",
                     threadId = 3,
                     senderId = "shift_planner",
                     text = "There is 1 extra shift available tomorrow.",
-                    time = "07:30"
+                    time = "07:30",
+                    createdAt = 6L,
+                    readByUserIds = listOf("shift_planner", "me")
                 )
             ),
             4 to listOf(
                 ChatMessage(
-                    id = 7,
+                    id = "7",
                     threadId = 4,
                     senderId = "john_miller",
                     text = "I finished the task at the customer site.",
-                    time = "15:05"
+                    time = "15:05",
+                    createdAt = 7L,
+                    readByUserIds = listOf("john_miller", "me")
                 ),
                 ChatMessage(
-                    id = 8,
+                    id = "8",
                     threadId = 4,
                     senderId = "me",
                     text = "Great work, thank you.",
-                    time = "15:08"
+                    time = "15:08",
+                    createdAt = 8L,
+                    readByUserIds = listOf("me", "john_miller")
                 )
             )
         )
     }
+
     fun createTimesheetEntries(): List<TimesheetEntry> {
         val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val today = LocalDate.now()

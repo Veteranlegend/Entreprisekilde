@@ -11,12 +11,30 @@ class DemoMessagesRepository : MessagesRepository {
         .mapValues { (_, messages) -> messages.toMutableList() }
         .toMutableMap()
 
-    override suspend fun getThreads(): List<MessageThread> {
-        return messageThreads.toList()
+    override suspend fun getThreadsForUser(userId: String): List<MessageThread> {
+        return messageThreads
+            .filter { it.participantIds.contains(userId) }
+            .sortedByDescending { it.updatedAt }
+    }
+
+    override fun startThreadsListener(
+        userId: String,
+        onUpdate: (List<MessageThread>) -> Unit,
+        onError: (String) -> Unit
+    ): () -> Unit {
+        onUpdate(
+            messageThreads
+                .filter { it.participantIds.contains(userId) }
+                .sortedByDescending { it.updatedAt }
+        )
+        return {}
     }
 
     override suspend fun getMessages(threadId: Int): List<ChatMessage> {
-        return chatMessages[threadId]?.toList() ?: emptyList()
+        return chatMessages[threadId]
+            ?.sortedBy { it.createdAt }
+            ?.toList()
+            ?: emptyList()
     }
 
     override fun startMessagesListener(
@@ -24,8 +42,45 @@ class DemoMessagesRepository : MessagesRepository {
         onUpdate: (List<ChatMessage>) -> Unit,
         onError: (String) -> Unit
     ): () -> Unit {
-        onUpdate(chatMessages[threadId]?.toList() ?: emptyList())
+        onUpdate(
+            chatMessages[threadId]
+                ?.sortedBy { it.createdAt }
+                ?.toList()
+                ?: emptyList()
+        )
         return {}
+    }
+
+    override suspend fun markThreadAsRead(
+        threadId: Int,
+        userId: String
+    ) {
+        val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
+        if (threadIndex == -1) return
+
+        val oldThread = messageThreads[threadIndex]
+        val updatedUnreadMap = oldThread.unreadCountByUser.toMutableMap()
+        updatedUnreadMap[userId] = 0
+
+        messageThreads[threadIndex] = oldThread.copy(
+            unreadCount = 0,
+            unreadCountByUser = updatedUnreadMap
+        )
+    }
+
+    override suspend fun markMessagesAsRead(
+        threadId: Int,
+        userId: String
+    ) {
+        val messages = chatMessages[threadId] ?: return
+
+        chatMessages[threadId] = messages.map { message ->
+            if (message.senderId != userId && !message.readByUserIds.contains(userId)) {
+                message.copy(readByUserIds = message.readByUserIds + userId)
+            } else {
+                message
+            }
+        }.toMutableList()
     }
 
     override suspend fun deleteThread(threadId: Int) {
@@ -39,14 +94,19 @@ class DemoMessagesRepository : MessagesRepository {
         text: String
     ) {
         val messages = chatMessages.getOrPut(threadId) { mutableListOf() }
+        val allMessages = chatMessages.values.flatten()
 
-        val newMessageId = (chatMessages.values.flatten().maxOfOrNull { it.id } ?: 0) + 1
+        val newMessageId = ((allMessages.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString()
+        val nowMillis = System.currentTimeMillis()
+
         val newMessage = ChatMessage(
             id = newMessageId,
             threadId = threadId,
             senderId = senderId,
             text = text,
-            time = currentTime()
+            time = currentTime(),
+            createdAt = nowMillis,
+            readByUserIds = listOf(senderId)
         )
 
         messages.add(newMessage)
@@ -54,34 +114,72 @@ class DemoMessagesRepository : MessagesRepository {
         val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
         if (threadIndex != -1) {
             val oldThread = messageThreads[threadIndex]
+            val updatedUnreadMap = oldThread.unreadCountByUser.toMutableMap()
+
+            oldThread.participantIds.forEach { participantId ->
+                updatedUnreadMap[participantId] = if (participantId == senderId) {
+                    0
+                } else {
+                    (updatedUnreadMap[participantId] ?: 0) + 1
+                }
+            }
+
             messageThreads[threadIndex] = oldThread.copy(
                 lastMessage = text,
-                unreadCount = 0
+                unreadCount = updatedUnreadMap[senderId] ?: 0,
+                unreadCountByUser = updatedUnreadMap,
+                updatedAt = nowMillis,
+                lastMessageSenderId = senderId
             )
         }
     }
 
-    override suspend fun findThreadById(threadId: Int): MessageThread? {
-        return messageThreads.firstOrNull { it.id == threadId }
+    override suspend fun findThreadById(
+        threadId: Int,
+        currentUserId: String
+    ): MessageThread? {
+        val thread = messageThreads.firstOrNull { it.id == threadId } ?: return null
+        return thread.copy(
+            unreadCount = thread.unreadCountByUser[currentUserId] ?: 0
+        )
     }
 
     override suspend fun createOrGetThread(
+        currentUserId: String,
+        currentUserName: String,
         recipientId: String,
         recipientName: String
     ): MessageThread {
-        val existingThread = messageThreads.firstOrNull { it.recipientId == recipientId }
+        val existingThread = messageThreads.firstOrNull { thread ->
+            thread.participantIds.contains(currentUserId) && thread.participantIds.contains(recipientId)
+        }
+
         if (existingThread != null) {
-            return existingThread
+            return existingThread.copy(
+                unreadCount = existingThread.unreadCountByUser[currentUserId] ?: 0
+            )
         }
 
         val newThreadId = (messageThreads.maxOfOrNull { it.id } ?: 0) + 1
+        val nowMillis = System.currentTimeMillis()
 
         val newThread = MessageThread(
             id = newThreadId,
             recipientId = recipientId,
             recipientName = recipientName,
             lastMessage = "",
-            unreadCount = 0
+            unreadCount = 0,
+            participantIds = listOf(currentUserId, recipientId),
+            participantNames = mapOf(
+                currentUserId to currentUserName,
+                recipientId to recipientName
+            ),
+            unreadCountByUser = mapOf(
+                currentUserId to 0,
+                recipientId to 0
+            ),
+            updatedAt = nowMillis,
+            lastMessageSenderId = ""
         )
 
         messageThreads.add(newThread)

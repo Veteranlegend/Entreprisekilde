@@ -59,11 +59,11 @@ fun CalendarScreen(
 ) {
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    val taskDates = remember(tasks) {
-        tasks.mapNotNull { task ->
+    val taskDates = tasks
+        .mapNotNull { task ->
             parseTaskDate(task.date)
-        }.toSet()
-    }
+        }
+        .toSet()
 
     val firstDayOfMonth = currentMonth.atDay(1)
     val daysInMonth = currentMonth.lengthOfMonth()

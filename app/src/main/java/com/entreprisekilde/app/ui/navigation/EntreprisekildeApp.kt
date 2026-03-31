@@ -1,6 +1,7 @@
 package com.entreprisekilde.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -22,14 +23,12 @@ import com.entreprisekilde.app.ui.notifications.NotificationViewModel
 @Composable
 fun EntreprisekildeApp() {
 
-    // 🔹 Repositories
     val userRepository = FirebaseUsersRepository()
     val tasksRepository = FirebaseTasksRepository()
     val messagesRepository = FirebaseMessagesRepository()
     val timesheetRepository = FirebaseTimesheetRepository()
     val notificationRepository = FirebaseNotificationRepository()
 
-    // 🔹 ViewModels
     val usersViewModel: UsersViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -73,15 +72,12 @@ fun EntreprisekildeApp() {
     val loggedInUser = usersViewModel.loggedInUser
     val isCheckingAuth = usersViewModel.isCheckingAuth
 
-    // 🔹 Start auth listener
     LaunchedEffect(Unit) {
         usersViewModel.startAuthObserver()
     }
 
-    // 🔹 WAIT until auth is checked
     if (isCheckingAuth) return
 
-    // 🔹 NOT LOGGED IN → LOGIN
     if (loggedInUser == null) {
         LoginScreen(
             errorMessage = usersViewModel.loginErrorMessage,
@@ -95,12 +91,16 @@ fun EntreprisekildeApp() {
         return
     }
 
-    // 🔹 LOGGED IN → START NOTIFICATIONS
-    LaunchedEffect(loggedInUser.id) {
+    DisposableEffect(loggedInUser.id) {
         notificationViewModel.startListeningForUser(loggedInUser.id)
+        messagesViewModel.startListeningForUser(loggedInUser.id)
+
+        onDispose {
+            notificationViewModel.stopListening()
+            messagesViewModel.stopListening()
+        }
     }
 
-    // 🔹 ROUTE BY ROLE
     if (loggedInUser.role.equals("admin", ignoreCase = true)) {
         AdminAppFlow(
             usersViewModel = usersViewModel,

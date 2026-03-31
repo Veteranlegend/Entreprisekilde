@@ -29,6 +29,8 @@ import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -39,9 +41,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +62,22 @@ import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
+import kotlinx.coroutines.delay
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Calendar
+
+private enum class TaskChangeType {
+    DATE,
+    ASSIGNEE,
+    STATUS
+}
+
+private data class TaskChangeConfirmation(
+    val taskId: String,
+    val message: String,
+    val type: TaskChangeType
+)
 
 @Composable
 fun TasksScreen(
@@ -81,6 +100,14 @@ fun TasksScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var taskPendingDelete by remember { mutableStateOf<TaskData?>(null) }
+    var confirmation by remember { mutableStateOf<TaskChangeConfirmation?>(null) }
+
+    LaunchedEffect(confirmation) {
+        if (confirmation != null) {
+            delay(2200)
+            confirmation = null
+        }
+    }
 
     val filteredTasks = tasks.filter { task ->
         searchQuery.isBlank() ||
@@ -100,175 +127,216 @@ fun TasksScreen(
         )
     )
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
-            .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFFE0A673))
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                modifier = Modifier
-                    .size(24.dp)
-                    .clickable { onBack() },
-                tint = Color.Black
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Text(
-                text = "All Tasks",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Assignment,
-                    contentDescription = "All Tasks",
-                    tint = Color(0xFF666666),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-        }
-
         Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search tasks...") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFE0A673))
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clickable { onBack() },
+                    tint = Color.Black
+                )
 
-            Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-            Box(
+                Text(
+                    text = "All Tasks",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Assignment,
+                        contentDescription = "All Tasks",
+                        tint = Color(0xFF666666),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-                when {
-                    isLoading -> {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "Loading tasks...",
-                                color = Color(0xFF555555)
-                            )
-                        }
-                    }
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search tasks...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
 
-                    !errorMessage.isNullOrBlank() -> {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = errorMessage,
-                                color = Color(0xFFB3261E),
-                                fontWeight = FontWeight.SemiBold
-                            )
+                Spacer(modifier = Modifier.height(14.dp))
 
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = onRetry,
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF79A7D8),
-                                    contentColor = Color.Black
-                                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        isLoading -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("Retry")
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Loading tasks...",
+                                    color = Color(0xFF555555)
+                                )
                             }
                         }
-                    }
 
-                    sortedTasks.isEmpty() -> {
-                        Text(
-                            text = "No tasks found.",
-                            color = Color(0xFF666666),
-                            fontSize = 15.sp
-                        )
-                    }
-
-                    else -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(sortedTasks, key = { it.id }) { task ->
-                                TaskCard(
-                                    task = task,
-                                    assignedUserOptions = assignedUserOptions,
-                                    onClick = { onTaskClick(task) },
-                                    onDeleteClick = { taskPendingDelete = task },
-                                    onStatusChange = { newStatus ->
-                                        onStatusChange(task.id, newStatus)
-                                    },
-                                    onQuickUpdateTask = onQuickUpdateTask
+                        !errorMessage.isNullOrBlank() -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = errorMessage,
+                                    color = Color(0xFFB3261E),
+                                    fontWeight = FontWeight.SemiBold
                                 )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = onRetry,
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF79A7D8),
+                                        contentColor = Color.Black
+                                    )
+                                ) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+
+                        sortedTasks.isEmpty() -> {
+                            Text(
+                                text = "No tasks found.",
+                                color = Color(0xFF666666),
+                                fontSize = 15.sp
+                            )
+                        }
+
+                        else -> {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(sortedTasks, key = { it.id }) { task ->
+                                    TaskCard(
+                                        task = task,
+                                        assignedUserOptions = assignedUserOptions,
+                                        onClick = { onTaskClick(task) },
+                                        onDeleteClick = { taskPendingDelete = task },
+                                        onStatusChange = { newStatus ->
+                                            onStatusChange(task.id, newStatus)
+                                            confirmation = TaskChangeConfirmation(
+                                                taskId = task.id,
+                                                message = "Task status changed to ${taskStatusLabel(newStatus)}.",
+                                                type = TaskChangeType.STATUS
+                                            )
+                                        },
+                                        onQuickUpdateTask = { updatedTask, changeType ->
+                                            onQuickUpdateTask(updatedTask)
+
+                                            confirmation = when (changeType) {
+                                                TaskChangeType.DATE -> TaskChangeConfirmation(
+                                                    taskId = task.id,
+                                                    message = "Task date changed to ${formatDateForDisplay(updatedTask.date)}.",
+                                                    type = TaskChangeType.DATE
+                                                )
+
+                                                TaskChangeType.ASSIGNEE -> TaskChangeConfirmation(
+                                                    taskId = task.id,
+                                                    message = "Task assigned to ${updatedTask.assignTo}.",
+                                                    type = TaskChangeType.ASSIGNEE
+                                                )
+
+                                                TaskChangeType.STATUS -> TaskChangeConfirmation(
+                                                    taskId = task.id,
+                                                    message = "Task status changed to ${taskStatusLabel(updatedTask.status)}.",
+                                                    type = TaskChangeType.STATUS
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = onCreateTaskClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF79A7D8),
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Text(
+                        text = "Create a Task",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Button(
-                onClick = onCreateTaskClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF79A7D8),
-                    contentColor = Color.Black
-                )
-            ) {
-                Text(
-                    text = "Create a Task",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            AppBottomNavBar(
+                selectedItem = BottomNavDestination.HOME,
+                unreadNotificationCount = unreadNotificationCount,
+                onHomeClick = onHomeClick,
+                onMessagesClick = onMessagesClick,
+                onNotificationsClick = onNotificationsClick,
+                onProfileClick = onProfileClick
+            )
         }
 
-        AppBottomNavBar(
-            selectedItem = BottomNavDestination.HOME,
-            unreadNotificationCount = unreadNotificationCount,
-            onHomeClick = onHomeClick,
-            onMessagesClick = onMessagesClick,
-            onNotificationsClick = onNotificationsClick,
-            onProfileClick = onProfileClick
-        )
+        confirmation?.let { currentConfirmation ->
+            TaskChangeConfirmationBanner(
+                message = currentConfirmation.message,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+            )
+        }
     }
 
     taskPendingDelete?.let { task ->
@@ -304,7 +372,7 @@ private fun TaskCard(
     onClick: () -> Unit = {},
     onDeleteClick: () -> Unit = {},
     onStatusChange: (TaskStatus) -> Unit = {},
-    onQuickUpdateTask: (TaskData) -> Unit = {}
+    onQuickUpdateTask: (TaskData, TaskChangeType) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
 
@@ -317,16 +385,28 @@ private fun TaskCard(
         TaskStatus.COMPLETED -> Color(0xFFC7EBC4)
     }
 
-    val calendar = remember { Calendar.getInstance() }
+    val currentTaskDate = parseTaskDate(task.date)
+    val calendar = remember(task.id, task.date) {
+        Calendar.getInstance().apply {
+            val parsedDate = currentTaskDate
+            if (parsedDate != null) {
+                set(Calendar.YEAR, parsedDate.year)
+                set(Calendar.MONTH, parsedDate.monthValue - 1)
+                set(Calendar.DAY_OF_MONTH, parsedDate.dayOfMonth)
+            }
+        }
+    }
 
     val datePickerDialog = remember(task.id, task.date) {
         DatePickerDialog(
             context,
             { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
-                val formattedMonth = (month + 1).toString().padStart(2, '0')
-                val formattedDay = dayOfMonth.toString().padStart(2, '0')
-                val newDate = "$year-$formattedMonth-$formattedDay"
-                onQuickUpdateTask(task.copy(date = newDate))
+                val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
+                val newDate = selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+
+                if (normalizeTaskDate(task.date) != normalizeTaskDate(newDate)) {
+                    onQuickUpdateTask(task.copy(date = newDate), TaskChangeType.DATE)
+                }
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
@@ -377,7 +457,9 @@ private fun TaskCard(
                         DropdownMenuItem(
                             text = { Text(taskStatusLabel(value)) },
                             onClick = {
-                                onStatusChange(value)
+                                if (value != task.status) {
+                                    onStatusChange(value)
+                                }
                                 statusExpanded = false
                             }
                         )
@@ -416,7 +498,7 @@ private fun TaskCard(
                 Spacer(modifier = Modifier.width(6.dp))
 
                 Text(
-                    text = task.date,
+                    text = formatDateForDisplay(task.date),
                     fontSize = 13.sp
                 )
 
@@ -480,7 +562,12 @@ private fun TaskCard(
                         DropdownMenuItem(
                             text = { Text(fullName) },
                             onClick = {
-                                onQuickUpdateTask(task.copy(assignTo = fullName))
+                                if (fullName != task.assignTo) {
+                                    onQuickUpdateTask(
+                                        task.copy(assignTo = fullName),
+                                        TaskChangeType.ASSIGNEE
+                                    )
+                                }
                                 assignExpanded = false
                             }
                         )
@@ -493,8 +580,34 @@ private fun TaskCard(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            if (task.taskDetails.isNotBlank()) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Notes,
+                        contentDescription = "Task details preview",
+                        tint = Color(0xFF7A7A7A),
+                        modifier = Modifier.size(16.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Text(
+                        text = task.taskDetails.trim(),
+                        fontSize = 13.sp,
+                        color = Color(0xFF666666),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
             IconButton(
                 onClick = onDeleteClick
             ) {
@@ -504,6 +617,48 @@ private fun TaskCard(
                     tint = Color(0xFFB85C5C)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun TaskChangeConfirmationBanner(
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFFEDF7EE),
+        shadowElevation = 10.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(Color(0xFFD7F0DA), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "Confirmation",
+                    tint = Color(0xFF2E7D32),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Text(
+                text = message,
+                color = Color(0xFF234F2A),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -525,5 +680,31 @@ private fun statusSortOrder(status: TaskStatus): Int {
 }
 
 private fun dateToSortableNumber(date: String): Int {
-    return date.replace("-", "").toIntOrNull() ?: 0
+    val parsedDate = parseTaskDate(date) ?: return 0
+    return parsedDate.format(DateTimeFormatter.ofPattern("yyyyMMdd")).toIntOrNull() ?: 0
+}
+
+private fun parseTaskDate(date: String): LocalDate? {
+    val supportedFormats = listOf(
+        DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    )
+
+    for (formatter in supportedFormats) {
+        try {
+            return LocalDate.parse(date, formatter)
+        } catch (_: Exception) {
+        }
+    }
+
+    return null
+}
+
+private fun normalizeTaskDate(date: String): String {
+    val parsedDate = parseTaskDate(date) ?: return date
+    return parsedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+}
+
+private fun formatDateForDisplay(date: String): String {
+    return normalizeTaskDate(date)
 }

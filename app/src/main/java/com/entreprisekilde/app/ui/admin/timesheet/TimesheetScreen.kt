@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.ui.admin.timesheet
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,12 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ModeEdit
 import androidx.compose.material.icons.outlined.RestartAlt
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,7 +79,6 @@ fun TimesheetScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
-    var searchText by remember { mutableStateOf("") }
     var showAssignDialog by remember { mutableStateOf(false) }
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
     var undoTargetId by remember { mutableStateOf<String?>(null) }
@@ -84,12 +86,17 @@ fun TimesheetScreen(
     var showUndoDialog by remember { mutableStateOf(false) }
     var expandedUpcomingEntryId by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val filteredEntries = timesheets.filter {
-        searchText.isBlank() ||
-                it.date.contains(searchText, ignoreCase = true) ||
-                it.fromTime.contains(searchText, ignoreCase = true) ||
-                it.toTime.contains(searchText, ignoreCase = true) ||
-                it.approvalStatus.name.contains(searchText, ignoreCase = true)
+    var fromDateFilter by rememberSaveable { mutableStateOf("") }
+    var toDateFilter by rememberSaveable { mutableStateOf("") }
+
+    val fromDateParsed = parseOptionalTimesheetDate(fromDateFilter)
+    val toDateParsed = parseOptionalTimesheetDate(toDateFilter)
+
+    val filteredEntries = timesheets.filter { entry ->
+        val entryDate = parseTimesheetDate(entry.date)
+        val matchesFromDate = fromDateParsed?.let { !entryDate.isBefore(it) } ?: true
+        val matchesToDate = toDateParsed?.let { !entryDate.isAfter(it) } ?: true
+        matchesFromDate && matchesToDate
     }
 
     val sortedEntries = filteredEntries.sortedByDescending { parseTimesheetDate(it.date) }
@@ -117,6 +124,8 @@ fun TimesheetScreen(
     val assignedMinutesTotal = sortedEntries
         .filter { it.approvalStatus != ShiftApprovalStatus.DECLINED }
         .sumOf { durationInMinutes(it.fromTime, it.toTime) }
+
+    val hasDateFilter = fromDateFilter.isNotBlank() || toDateFilter.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -168,38 +177,67 @@ fun TimesheetScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Text(
                 text = "Timesheet",
-                fontSize = 20.sp,
+                fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = "Search"
-                    )
-                },
-                placeholder = { Text("Search") },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Date filter",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF3A3A3A)
                 )
-            )
 
-            Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.weight(1f))
+
+                if (hasDateFilter) {
+                    TextButton(
+                        onClick = {
+                            fromDateFilter = ""
+                            toDateFilter = ""
+                        }
+                    ) {
+                        Text(
+                            text = "Clear",
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DateFilterField(
+                    label = "From",
+                    value = fromDateFilter,
+                    modifier = Modifier.weight(1f),
+                    onDateSelected = { fromDateFilter = it }
+                )
+
+                DateFilterField(
+                    label = "To",
+                    value = toDateFilter,
+                    modifier = Modifier.weight(1f),
+                    onDateSelected = { toDateFilter = it }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -207,7 +245,7 @@ fun TimesheetScreen(
             ) {
                 Text(
                     text = "${sortedEntries.size} Results",
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     color = Color(0xFF222222)
                 )
 
@@ -217,7 +255,7 @@ fun TimesheetScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "Assigned:",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = Color(0xFF7A7A7A)
                         )
 
@@ -225,18 +263,18 @@ fun TimesheetScreen(
 
                         Text(
                             text = minutesToDurationString(assignedMinutesTotal),
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "Approved:",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = Color(0xFF7A7A7A)
                         )
 
@@ -244,7 +282,7 @@ fun TimesheetScreen(
 
                         Text(
                             text = minutesToDurationString(approvedMinutesTotal),
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
                         )
@@ -252,11 +290,11 @@ fun TimesheetScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (upcomingEntries.isNotEmpty()) {
                     item { SectionTitle("Upcoming shifts") }
@@ -353,16 +391,30 @@ fun TimesheetScreen(
                         )
                     }
                 }
+
+                if (sortedEntries.isEmpty()) {
+                    item {
+                        Text(
+                            text = if (hasDateFilter) {
+                                "No timesheet entries found in this date range."
+                            } else {
+                                "No timesheet entries found."
+                            },
+                            color = Color(0xFF666666),
+                            fontSize = 13.sp
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Button(
                 onClick = { showAssignDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .height(40.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF55A8E3),
                     contentColor = Color.White
@@ -370,13 +422,14 @@ fun TimesheetScreen(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Add,
-                    contentDescription = null
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "Assign Shift",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -496,15 +549,84 @@ fun TimesheetScreen(
 }
 
 @Composable
+private fun DateFilterField(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onDateSelected: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val initialDate = parseOptionalTimesheetDate(value) ?: LocalDate.now()
+
+    val datePickerDialog = remember(value) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
+                onDateSelected(selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+            },
+            initialDate.year,
+            initialDate.monthValue - 1,
+            initialDate.dayOfMonth
+        )
+    }
+
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = Color(0xFF666666),
+            fontWeight = FontWeight.Medium
+        )
+
+        Spacer(modifier = Modifier.height(3.dp))
+
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            textStyle = TextStyle(
+                fontSize = 11.sp,
+                color = Color.Black
+            ),
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = "Pick date",
+                    tint = Color(0xFF666666),
+                    modifier = Modifier.size(16.dp)
+                )
+            },
+            placeholder = {
+                Text(
+                    text = "dd/MM/yyyy",
+                    fontSize = 11.sp
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clickable { datePickerDialog.show() },
+            shape = RoundedCornerShape(10.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                disabledContainerColor = Color.White
+            )
+        )
+    }
+}
+
+@Composable
 private fun SectionTitle(
     title: String
 ) {
     Text(
         text = title,
-        fontSize = 16.sp,
+        fontSize = 15.sp,
         fontWeight = FontWeight.Bold,
-        color = Color(0xFF3A3A3A),
-        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+        color = Color(0xFF3A3A3A)
     )
 }
 
@@ -816,6 +938,12 @@ private fun parseTimesheetDate(date: String): LocalDate {
     }
 
     return LocalDate.MIN
+}
+
+private fun parseOptionalTimesheetDate(date: String): LocalDate? {
+    if (date.isBlank()) return null
+    val parsed = parseTimesheetDate(date)
+    return if (parsed == LocalDate.MIN) null else parsed
 }
 
 private fun prettyTimesheetDate(date: String): String {

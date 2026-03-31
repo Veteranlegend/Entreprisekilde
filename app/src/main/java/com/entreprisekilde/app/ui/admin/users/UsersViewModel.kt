@@ -21,9 +21,6 @@ class UsersViewModel(
     var selectedUser by mutableStateOf<User?>(null)
         private set
 
-
-
-
     var loggedInUser by mutableStateOf<User?>(null)
         private set
 
@@ -57,6 +54,15 @@ class UsersViewModel(
     var updateUserErrorMessage by mutableStateOf<String?>(null)
         private set
 
+    var deleteUserMessage by mutableStateOf<String?>(null)
+        private set
+
+    var deleteUserErrorMessage by mutableStateOf<String?>(null)
+        private set
+
+    var isDeletingUser by mutableStateOf(false)
+        private set
+
     var changePasswordMessage by mutableStateOf<String?>(null)
         private set
 
@@ -86,11 +92,43 @@ class UsersViewModel(
         }
     }
 
-    fun deleteUser(userId: String) {
-        viewModelScope.launch {
-            userRepository.deleteUser(userId)
-            loadUsers()
+    fun deleteUser(userId: String, onSuccess: () -> Unit = {}) {
+        if (isDeletingUser) return
+
+        if (loggedInUser?.id == userId) {
+            deleteUserErrorMessage = "You cannot delete your own account."
+            return
         }
+
+        viewModelScope.launch {
+            isDeletingUser = true
+            deleteUserMessage = null
+            deleteUserErrorMessage = null
+
+            val result = userRepository.deleteUser(userId)
+
+            result
+                .onSuccess {
+                    refreshUsers()
+
+                    if (selectedUser?.id == userId) {
+                        selectedUser = null
+                    }
+
+                    deleteUserMessage = "User deleted successfully."
+                    onSuccess()
+                }
+                .onFailure { exception ->
+                    deleteUserErrorMessage = exception.message ?: "Failed to delete user."
+                }
+
+            isDeletingUser = false
+        }
+    }
+
+    fun clearDeleteUserMessages() {
+        deleteUserMessage = null
+        deleteUserErrorMessage = null
     }
 
     fun login(username: String, password: String) {
@@ -215,6 +253,7 @@ class UsersViewModel(
         isLocked = false
         failedAttempts = 0
         clearChangePasswordMessages()
+        clearDeleteUserMessages()
     }
 
     fun selectUser(user: User) {
@@ -307,6 +346,4 @@ class UsersViewModel(
         super.onCleared()
         userRepository.stopObservingAuthState()
     }
-
-
 }

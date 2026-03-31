@@ -5,7 +5,13 @@ import com.entreprisekilde.app.data.model.messages.MessageThread
 
 interface MessagesRepository {
 
-    suspend fun getThreads(): List<MessageThread>
+    suspend fun getThreadsForUser(userId: String): List<MessageThread>
+
+    fun startThreadsListener(
+        userId: String,
+        onUpdate: (List<MessageThread>) -> Unit,
+        onError: (String) -> Unit = {}
+    ): () -> Unit
 
     suspend fun getMessages(threadId: Int): List<ChatMessage>
 
@@ -15,6 +21,16 @@ interface MessagesRepository {
         onError: (String) -> Unit = {}
     ): () -> Unit
 
+    suspend fun markThreadAsRead(
+        threadId: Int,
+        userId: String
+    )
+
+    suspend fun markMessagesAsRead(
+        threadId: Int,
+        userId: String
+    )
+
     suspend fun deleteThread(threadId: Int)
 
     suspend fun sendMessage(
@@ -23,9 +39,14 @@ interface MessagesRepository {
         text: String
     )
 
-    suspend fun findThreadById(threadId: Int): MessageThread?
+    suspend fun findThreadById(
+        threadId: Int,
+        currentUserId: String
+    ): MessageThread?
 
     suspend fun createOrGetThread(
+        currentUserId: String,
+        currentUserName: String,
         recipientId: String,
         recipientName: String
     ): MessageThread

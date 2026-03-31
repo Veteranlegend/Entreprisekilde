@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Delete
@@ -92,9 +93,26 @@ fun MessagesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFE0A673))
-                    .padding(horizontal = 24.dp, vertical = 22.dp),
+                    .padding(horizontal = 16.dp, vertical = 22.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(Color.White, CircleShape)
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color(0xFF666666),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
                 Text(
                     text = "Message",
                     fontSize = 30.sp,
@@ -332,7 +350,7 @@ private fun SwipeToRevealThreadCard(
                 Text(
                     text = thread.recipientName,
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = if (thread.unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
                     color = Color.Black
                 )
 
@@ -341,7 +359,7 @@ private fun SwipeToRevealThreadCard(
                 Text(
                     text = thread.lastMessage,
                     fontSize = 14.sp,
-                    color = Color(0xFF777777),
+                    color = if (thread.unreadCount > 0) Color.Black else Color(0xFF777777),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )

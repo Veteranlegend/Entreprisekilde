@@ -82,6 +82,13 @@ fun CreateTaskScreen(
     var assignToExpanded by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
+    var customerError by remember { mutableStateOf<String?>(null) }
+    var phoneNumberError by remember { mutableStateOf<String?>(null) }
+    var addressError by remember { mutableStateOf<String?>(null) }
+    var dateError by remember { mutableStateOf<String?>(null) }
+    var assignToError by remember { mutableStateOf<String?>(null) }
+    var taskDetailsError by remember { mutableStateOf<String?>(null) }
+
     val headerColor = Color(0xFFE0A673)
     val buttonColor = Color(0xFFCFE0D0)
     val buttonTextColor = Color(0xFF3F6E48)
@@ -95,6 +102,7 @@ fun CreateTaskScreen(
             { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
                 val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
                 date = selectedDate.format(displayFormatter)
+                dateError = null
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
@@ -106,6 +114,22 @@ fun CreateTaskScreen(
             } catch (_: Exception) {
             }
         }
+    }
+
+    fun validateFields(): Boolean {
+        customerError = if (customer.trim().isBlank()) "Customer is required" else null
+        phoneNumberError = if (phoneNumber.trim().isBlank()) "Phone number is required" else null
+        addressError = if (address.trim().isBlank()) "Address is required" else null
+        dateError = if (date.trim().isBlank()) "Date is required" else null
+        assignToError = if (assignTo.trim().isBlank() || assignedUserId.trim().isBlank()) "Please select an employee" else null
+        taskDetailsError = if (taskDetails.trim().isBlank()) "Task details are required" else null
+
+        return customerError == null &&
+                phoneNumberError == null &&
+                addressError == null &&
+                dateError == null &&
+                assignToError == null &&
+                taskDetailsError == null
     }
 
     if (showSuccessDialog) {
@@ -190,25 +214,38 @@ fun CreateTaskScreen(
             SmallField(
                 label = "Customer",
                 value = customer,
-                onValueChange = { customer = it }
+                onValueChange = {
+                    customer = it
+                    if (it.trim().isNotBlank()) customerError = null
+                },
+                errorMessage = customerError
             )
 
             SmallField(
                 label = "Phone Number",
                 value = phoneNumber,
-                onValueChange = { phoneNumber = it }
+                onValueChange = {
+                    phoneNumber = it
+                    if (it.trim().isNotBlank()) phoneNumberError = null
+                },
+                errorMessage = phoneNumberError
             )
 
             SmallField(
                 label = "Address",
                 value = address,
-                onValueChange = { address = it }
+                onValueChange = {
+                    address = it
+                    if (it.trim().isNotBlank()) addressError = null
+                },
+                errorMessage = addressError
             )
 
             DateSelectorField(
                 label = "Date",
                 value = date,
-                onClick = { datePickerDialog.show() }
+                onClick = { datePickerDialog.show() },
+                errorMessage = dateError
             )
 
             AssignToSelectorField(
@@ -222,21 +259,29 @@ fun CreateTaskScreen(
                     assignTo = selectedUser.fullName
                     assignedUserId = selectedUser.id
                     assignToExpanded = false
-                }
+                    assignToError = null
+                },
+                errorMessage = assignToError
             )
 
             SmallField(
                 label = "Task Details",
                 value = taskDetails,
-                onValueChange = { taskDetails = it },
+                onValueChange = {
+                    taskDetails = it
+                    if (it.trim().isNotBlank()) taskDetailsError = null
+                },
                 singleLine = false,
-                minLines = 4
+                minLines = 4,
+                errorMessage = taskDetailsError
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = {
+                    if (!validateFields()) return@Button
+
                     onCreateTask(
                         TaskData(
                             id = "",
@@ -259,6 +304,14 @@ fun CreateTaskScreen(
                     assignedUserId = ""
                     taskDetails = ""
                     assignToExpanded = false
+
+                    customerError = null
+                    phoneNumberError = null
+                    addressError = null
+                    dateError = null
+                    assignToError = null
+                    taskDetailsError = null
+
                     showSuccessDialog = true
                 },
                 modifier = Modifier
@@ -295,7 +348,8 @@ private fun SmallField(
     value: String,
     onValueChange: (String) -> Unit,
     singleLine: Boolean = true,
-    minLines: Int = 1
+    minLines: Int = 1,
+    errorMessage: String? = null
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -316,15 +370,26 @@ private fun SmallField(
             minLines = minLines,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
+            isError = errorMessage != null,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White,
-                focusedBorderColor = Color(0xFF9AA0A6),
-                unfocusedBorderColor = Color(0xFF9AA0A6),
+                focusedBorderColor = if (errorMessage != null) Color(0xFFC62828) else Color(0xFF9AA0A6),
+                unfocusedBorderColor = if (errorMessage != null) Color(0xFFC62828) else Color(0xFF9AA0A6),
                 focusedTextColor = Color.Black,
                 unfocusedTextColor = Color.Black
             )
         )
+
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = errorMessage,
+                color = Color(0xFFC62828),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -332,7 +397,8 @@ private fun SmallField(
 private fun DateSelectorField(
     label: String,
     value: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    errorMessage: String? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -360,11 +426,12 @@ private fun DateSelectorField(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
+                isError = errorMessage != null,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF9AA0A6),
-                    unfocusedBorderColor = Color(0xFF9AA0A6),
+                    focusedBorderColor = if (errorMessage != null) Color(0xFFC62828) else Color(0xFF9AA0A6),
+                    unfocusedBorderColor = if (errorMessage != null) Color(0xFFC62828) else Color(0xFF9AA0A6),
                     focusedTextColor = Color.Black,
                     unfocusedTextColor = Color.Black
                 )
@@ -379,6 +446,16 @@ private fun DateSelectorField(
                     ) { onClick() }
             )
         }
+
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = errorMessage,
+                color = Color(0xFFC62828),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -390,7 +467,8 @@ private fun AssignToSelectorField(
     expanded: Boolean,
     onExpand: () -> Unit,
     onDismiss: () -> Unit,
-    onSelect: (User) -> Unit
+    onSelect: (User) -> Unit,
+    errorMessage: String? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -418,11 +496,12 @@ private fun AssignToSelectorField(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
+                isError = errorMessage != null,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF9AA0A6),
-                    unfocusedBorderColor = Color(0xFF9AA0A6),
+                    focusedBorderColor = if (errorMessage != null) Color(0xFFC62828) else Color(0xFF9AA0A6),
+                    unfocusedBorderColor = if (errorMessage != null) Color(0xFFC62828) else Color(0xFF9AA0A6),
                     focusedTextColor = Color.Black,
                     unfocusedTextColor = Color.Black
                 )
@@ -448,6 +527,16 @@ private fun AssignToSelectorField(
                     )
                 }
             }
+        }
+
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = errorMessage,
+                color = Color(0xFFC62828),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

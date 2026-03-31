@@ -34,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,8 +54,13 @@ import com.entreprisekilde.app.data.model.users.User
 @Composable
 fun UserDetailsScreen(
     user: User,
+    isCurrentLoggedInUser: Boolean,
+    isDeleting: Boolean = false,
+    deleteErrorMessage: String? = null,
     onBack: () -> Unit = {},
     onSaveUser: (User) -> Unit = {},
+    onDeleteUser: (String) -> Unit = {},
+    onClearDeleteMessage: () -> Unit = {},
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
@@ -63,6 +69,7 @@ fun UserDetailsScreen(
     var isEditing by remember(user.id) { mutableStateOf(false) }
     var isSaving by remember(user.id) { mutableStateOf(false) }
     var showSuccessDialog by remember(user.id) { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember(user.id) { mutableStateOf(false) }
 
     var email by remember(user.id) { mutableStateOf(user.email) }
     var firstName by remember(user.id) { mutableStateOf(user.firstName) }
@@ -78,6 +85,8 @@ fun UserDetailsScreen(
         username = user.username
         isEditing = false
         isSaving = false
+        showDeleteConfirmDialog = false
+        onClearDeleteMessage()
     }
 
     if (showSuccessDialog) {
@@ -109,6 +118,51 @@ fun UserDetailsScreen(
         )
     }
 
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isDeleting) {
+                    showDeleteConfirmDialog = false
+                }
+            },
+            title = {
+                Text(
+                    text = "Delete user",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("Are you sure you want to delete this user? This will remove the user from the app database.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteUser(user.id)
+                    },
+                    enabled = !isDeleting
+                ) {
+                    Text(
+                        text = if (isDeleting) "Deleting..." else "Delete",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                    },
+                    enabled = !isDeleting
+                ) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color.White
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -124,7 +178,7 @@ fun UserDetailsScreen(
         ) {
             IconButton(
                 onClick = {
-                    if (!isSaving) onBack()
+                    if (!isSaving && !isDeleting) onBack()
                 }
             ) {
                 Icon(
@@ -179,11 +233,20 @@ fun UserDetailsScreen(
                 readOnly = true
             )
 
+            if (!deleteErrorMessage.isNullOrBlank()) {
+                Text(
+                    text = deleteErrorMessage,
+                    color = Color.Red,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
             Button(
                 onClick = {
-                    if (isSaving) return@Button
+                    if (isSaving || isDeleting) return@Button
 
                     if (isEditing) {
                         val updatedUser = user.copy(
@@ -221,6 +284,30 @@ fun UserDetailsScreen(
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            if (!isCurrentLoggedInUser) {
+                Button(
+                    onClick = {
+                        if (!isDeleting && !isSaving) {
+                            showDeleteConfirmDialog = true
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFD9534F),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = if (isDeleting) "Deleting..." else "Delete User",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 

@@ -70,6 +70,9 @@ fun AdminAppFlow(
 
     val users = usersViewModel.users
     val tasks = tasksViewModel.tasks
+    val selectedUser = usersViewModel.selectedUser
+    val loggedInUser = usersViewModel.loggedInUser
+
     val taskAssignedUsers = users
         .filter { it.id.isNotBlank() }
         .distinctBy { it.id }
@@ -83,8 +86,6 @@ fun AdminAppFlow(
     val unreadNotificationCount = notificationViewModel.unreadCount
 
     val selectedTask = tasks.firstOrNull { it.id == selectedTaskId.value }
-    val selectedUser = usersViewModel.selectedUser
-    val loggedInUser = usersViewModel.loggedInUser
 
     val profileFirstName = loggedInUser?.firstName ?: "Admin"
     val profileLastName = loggedInUser?.lastName ?: ""
@@ -129,8 +130,11 @@ fun AdminAppFlow(
                                     .fillMaxWidth()
                                     .background(Color.White, RoundedCornerShape(16.dp))
                                     .clickable {
+                                        val currentUser = loggedInUser ?: return@clickable
                                         showNewChatDialog.value = false
                                         messagesViewModel.createOrGetThread(
+                                            currentUserId = currentUser.id,
+                                            currentUserName = currentUser.fullName,
                                             recipientId = user.id,
                                             recipientName = user.fullName
                                         ) {
@@ -214,8 +218,12 @@ fun AdminAppFlow(
             MessagesScreen(
                 threads = messagesViewModel.messageThreads,
                 unreadNotificationCount = unreadNotificationCount,
-                onThreadClick = {
-                    messagesViewModel.selectThread(it)
+                onThreadClick = { thread ->
+                    val currentUser = loggedInUser ?: return@MessagesScreen
+                    messagesViewModel.selectThread(
+                        thread = thread,
+                        currentUserId = currentUser.id
+                    )
                     currentScreen.value = AdminScreen.Chat
                 },
                 onNewChatClick = {
@@ -236,16 +244,31 @@ fun AdminAppFlow(
             val messages = messagesViewModel.getMessagesForSelectedThread()
 
             if (thread != null) {
+                LaunchedEffect(thread.id, loggedInUser?.id) {
+                    val currentUserId = loggedInUser?.id ?: return@LaunchedEffect
+                    messagesViewModel.markCurrentThreadAsRead(currentUserId)
+                }
+
                 ChatScreen(
                     thread = thread,
                     messages = messages,
                     loggedInUserId = loggedInUser?.id ?: "",
                     onBack = goToMessages,
                     onSendMessage = { msg ->
-                        val senderId = loggedInUser?.id ?: return@ChatScreen
+                        val currentUser = loggedInUser ?: return@ChatScreen
+                        val recipientId = thread.recipientId
+                        if (recipientId.isBlank()) return@ChatScreen
+
                         messagesViewModel.sendMessage(
-                            senderId = senderId,
-                            message = msg
+                            senderId = currentUser.id,
+                            message = msg,
+                            onSuccess = {
+                                notificationViewModel.addMessageNotification(
+                                    senderName = currentUser.fullName,
+                                    recipientUserId = recipientId,
+                                    threadId = thread.id
+                                )
+                            }
                         )
                     }
                 )
@@ -433,6 +456,7 @@ fun AdminAppFlow(
                 onBack = goToDashboard,
                 onCreateUserClick = goToCreateUser,
                 onUserClick = { user ->
+                    usersViewModel.clearDeleteUserMessages()
                     usersViewModel.selectUser(user)
                     currentScreen.value = AdminScreen.UserDetails
                 },
@@ -448,9 +472,21 @@ fun AdminAppFlow(
             if (user != null) {
                 UserDetailsScreen(
                     user = user,
+                    isCurrentLoggedInUser = loggedInUser?.id == user.id,
+                    isDeleting = usersViewModel.isDeletingUser,
+                    deleteErrorMessage = usersViewModel.deleteUserErrorMessage,
                     onBack = goToUsers,
                     onSaveUser = { updatedUser ->
                         usersViewModel.updateUser(updatedUser)
+                    },
+                    onDeleteUser = { userId ->
+                        usersViewModel.deleteUser(userId) {
+                            usersViewModel.clearSelectedUser()
+                            currentScreen.value = AdminScreen.Employees
+                        }
+                    },
+                    onClearDeleteMessage = {
+                        usersViewModel.clearDeleteUserMessages()
                     },
                     onHomeClick = goToDashboard,
                     onMessagesClick = goToMessages,
@@ -558,7 +594,13 @@ fun AdminAppFlow(
                         when (notification.type) {
                             NotificationType.MESSAGE -> {
                                 val threadId = notification.relatedThreadId
-                                if (threadId != null && messagesViewModel.selectThreadById(threadId)) {
+                                val currentUser = loggedInUser
+                                if (threadId != null && currentUser != null &&
+                                    messagesViewModel.selectThreadById(
+                                        threadId = threadId,
+                                        currentUserId = currentUser.id
+                                    )
+                                ) {
                                     currentScreen.value = AdminScreen.Chat
                                 } else {
                                     currentScreen.value = AdminScreen.Messages
