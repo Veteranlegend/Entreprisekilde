@@ -10,5 +10,6 @@ data class MessageThread(
     val participantNames: Map<String, String> = emptyMap(),
     val unreadCountByUser: Map<String, Int> = emptyMap(),
     val updatedAt: Long = 0L,
-    val lastMessageSenderId: String = ""
+    val lastMessageSenderId: String = "",
+    val typingUserIds: List<String> = emptyList()
 )

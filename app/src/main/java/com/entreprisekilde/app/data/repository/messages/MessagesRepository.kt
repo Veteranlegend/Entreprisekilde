@@ -31,6 +31,12 @@ interface MessagesRepository {
         userId: String
     )
 
+    suspend fun setTypingState(
+        threadId: Int,
+        userId: String,
+        isTyping: Boolean
+    )
+
     suspend fun deleteThread(threadId: Int)
 
     suspend fun sendMessage(

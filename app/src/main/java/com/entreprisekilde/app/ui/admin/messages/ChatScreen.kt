@@ -4,7 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,9 +33,28 @@ fun ChatScreen(
     messages: SnapshotStateList<ChatMessage>,
     loggedInUserId: String,
     onBack: () -> Unit = {},
-    onSendMessage: (String) -> Unit = {}
+    onSendMessage: (String) -> Unit = {},
+    onMessageTextChanged: (String) -> Unit = {},
+    onMarkAsRead: () -> Unit = {},
+    onStopTyping: () -> Unit = {}
 ) {
     var messageText by remember { mutableStateOf("") }
+
+    val isOtherUserTyping = thread.typingUserIds.any { it != loggedInUserId }
+
+    LaunchedEffect(messages.size, thread.id) {
+        onMarkAsRead()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            onStopTyping()
+        }
+    }
+
+    val lastMyMessageId = messages
+        .lastOrNull { it.senderId == loggedInUserId }
+        ?.id
 
     Column(
         modifier = Modifier
@@ -44,8 +63,6 @@ fun ChatScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .imePadding()
     ) {
-
-        // 🔹 TOP BAR
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -53,7 +70,12 @@ fun ChatScreen(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(
+                onClick = {
+                    onStopTyping()
+                    onBack()
+                }
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
@@ -76,15 +98,24 @@ fun ChatScreen(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            Text(
-                text = thread.recipientName,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
+            Column {
+                Text(
+                    text = thread.recipientName,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                if (isOtherUserTyping) {
+                    Text(
+                        text = "Typing...",
+                        fontSize = 12.sp,
+                        color = Color(0xFF3B6E57)
+                    )
+                }
+            }
         }
 
-        // 🔹 MESSAGES LIST
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -93,15 +124,20 @@ fun ChatScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             reverseLayout = false
         ) {
-            items(messages) { message ->
+            itemsIndexed(messages, key = { _, message -> message.id }) { _, message ->
+                val isFromMe = message.senderId == loggedInUserId
+                val isLastMyMessage = message.id == lastMyMessageId
+                val isSeenByOtherUser = thread.recipientId in message.readByUserIds
+
                 MessageBubble(
                     message = message,
-                    isFromMe = message.senderId == loggedInUserId
+                    isFromMe = isFromMe,
+                    showSeenStatus = isFromMe && isLastMyMessage,
+                    isSeen = isSeenByOtherUser
                 )
             }
         }
 
-        // 🔹 INPUT FIELD
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -110,10 +146,12 @@ fun ChatScreen(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-
             OutlinedTextField(
                 value = messageText,
-                onValueChange = { messageText = it },
+                onValueChange = {
+                    messageText = it
+                    onMessageTextChanged(it)
+                },
                 placeholder = { Text("Write a message...") },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(18.dp),
@@ -138,6 +176,7 @@ fun ChatScreen(
                         if (trimmed.isNotBlank()) {
                             onSendMessage(trimmed)
                             messageText = ""
+                            onMessageTextChanged("")
                         }
                     },
                 contentAlignment = Alignment.Center
@@ -155,13 +194,14 @@ fun ChatScreen(
 @Composable
 private fun MessageBubble(
     message: ChatMessage,
-    isFromMe: Boolean
+    isFromMe: Boolean,
+    showSeenStatus: Boolean,
+    isSeen: Boolean
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isFromMe) Alignment.End else Alignment.Start
     ) {
-
         Box(
             modifier = Modifier
                 .background(
@@ -178,13 +218,27 @@ private fun MessageBubble(
             )
         }
 
-        if (message.time.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = message.time,
-                fontSize = 11.sp,
-                color = Color(0xFF8A8A8A)
-            )
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (message.time.isNotBlank()) {
+                Text(
+                    text = message.time,
+                    fontSize = 11.sp,
+                    color = Color(0xFF8A8A8A)
+                )
+            }
+
+            if (showSeenStatus) {
+                Text(
+                    text = if (isSeen) "Seen" else "Sent",
+                    fontSize = 11.sp,
+                    color = Color(0xFF8A8A8A)
+                )
+            }
         }
     }
 }

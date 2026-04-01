@@ -17,6 +17,29 @@ class DemoMessagesRepository : MessagesRepository {
             .sortedByDescending { it.updatedAt }
     }
 
+    override suspend fun setTypingState(
+        threadId: Int,
+        userId: String,
+        isTyping: Boolean
+    ) {
+        val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
+        if (threadIndex == -1) return
+
+        val oldThread = messageThreads[threadIndex]
+        val updatedTypingUsers = oldThread.typingUserIds.toMutableList()
+
+        if (isTyping) {
+            if (!updatedTypingUsers.contains(userId)) {
+                updatedTypingUsers.add(userId)
+            }
+        } else {
+            updatedTypingUsers.remove(userId)
+        }
+
+        messageThreads[threadIndex] = oldThread.copy(
+            typingUserIds = updatedTypingUsers
+        )
+    }
     override fun startThreadsListener(
         userId: String,
         onUpdate: (List<MessageThread>) -> Unit,

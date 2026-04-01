@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.entreprisekilde.app.data.model.messages.ChatMessage
 import com.entreprisekilde.app.data.model.messages.MessageThread
 import com.entreprisekilde.app.data.repository.messages.MessagesRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MessagesViewModel(
@@ -21,6 +23,7 @@ class MessagesViewModel(
     private var activeUserId: String? = null
     private var removeThreadsListener: (() -> Unit)? = null
     private var removeMessagesListener: (() -> Unit)? = null
+    private var typingStopJob: Job? = null
 
     fun startListeningForUser(userId: String) {
         if (activeUserId == userId && removeThreadsListener != null) return
@@ -47,6 +50,18 @@ class MessagesViewModel(
     }
 
     fun stopListening() {
+        val threadId = selectedThread.value?.id
+        val userId = activeUserId
+
+        if (threadId != null && userId != null) {
+            viewModelScope.launch {
+                try {
+                    repository.setTypingState(threadId, userId, false)
+                } catch (_: Exception) {
+                }
+            }
+        }
+
         activeUserId = null
         stopListeningToThreads()
         stopListeningToMessages()
@@ -136,6 +151,8 @@ class MessagesViewModel(
                     text = message
                 )
 
+                repository.setTypingState(thread.id, senderId, false)
+
                 val updatedThread = repository.findThreadById(
                     threadId = thread.id,
                     currentUserId = currentUserId
@@ -170,6 +187,48 @@ class MessagesViewModel(
                 }
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to mark chat as read."
+            }
+        }
+    }
+
+    fun onMessageInputChanged(currentUserId: String, text: String) {
+        val thread = selectedThread.value ?: return
+
+        viewModelScope.launch {
+            try {
+                repository.setTypingState(
+                    threadId = thread.id,
+                    userId = currentUserId,
+                    isTyping = text.isNotBlank()
+                )
+            } catch (_: Exception) {
+            }
+        }
+
+        typingStopJob?.cancel()
+        if (text.isNotBlank()) {
+            typingStopJob = viewModelScope.launch {
+                delay(2000)
+                try {
+                    repository.setTypingState(
+                        threadId = thread.id,
+                        userId = currentUserId,
+                        isTyping = false
+                    )
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    fun clearTypingState(currentUserId: String) {
+        val thread = selectedThread.value ?: return
+
+        typingStopJob?.cancel()
+        viewModelScope.launch {
+            try {
+                repository.setTypingState(thread.id, currentUserId, false)
+            } catch (_: Exception) {
             }
         }
     }

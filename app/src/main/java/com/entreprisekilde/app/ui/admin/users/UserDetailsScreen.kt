@@ -132,7 +132,13 @@ fun UserDetailsScreen(
                 )
             },
             text = {
-                Text("Are you sure you want to delete this user? This will remove the user from the app database.")
+                Text(
+                    text = if (isCurrentLoggedInUser) {
+                        "Are you sure you want to delete this account?"
+                    } else {
+                        "Are you sure you want to delete this user?"
+                    }
+                )
             },
             confirmButton = {
                 TextButton(
@@ -286,28 +292,26 @@ fun UserDetailsScreen(
                 )
             }
 
-            if (!isCurrentLoggedInUser) {
-                Button(
-                    onClick = {
-                        if (!isDeleting && !isSaving) {
-                            showDeleteConfirmDialog = true
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFD9534F),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = if (isDeleting) "Deleting..." else "Delete User",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            Button(
+                onClick = {
+                    if (!isDeleting && !isSaving) {
+                        showDeleteConfirmDialog = true
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFD9534F),
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = if (isDeleting) "Deleting..." else "Delete User",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 

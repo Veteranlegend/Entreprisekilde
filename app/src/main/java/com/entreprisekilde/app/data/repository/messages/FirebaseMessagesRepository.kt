@@ -134,13 +134,13 @@ class FirebaseMessagesRepository : MessagesRepository {
         val data = snapshot.data ?: return
 
         val unreadMapAny = data["unreadCountByUser"] as? Map<*, *> ?: emptyMap<Any, Any>()
-        val unreadMap = unreadMapAny.entries.associate { it.key.toString() to ((it.value as? Number)?.toInt() ?: 0) }
-            .toMutableMap()
+        val unreadMap = unreadMapAny.entries.associate {
+            it.key.toString() to ((it.value as? Number)?.toInt() ?: 0)
+        }.toMutableMap()
 
         if ((unreadMap[userId] ?: 0) == 0) return
 
         unreadMap[userId] = 0
-
         threadRef.update("unreadCountByUser", unreadMap).await()
     }
 
@@ -170,6 +170,20 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         if (changed) {
             batch.commit().await()
+        }
+    }
+
+    override suspend fun setTypingState(
+        threadId: Int,
+        userId: String,
+        isTyping: Boolean
+    ) {
+        val threadRef = threadsCollection.document(threadId.toString())
+
+        if (isTyping) {
+            threadRef.update("typingUserIds", FieldValue.arrayUnion(userId)).await()
+        } else {
+            threadRef.update("typingUserIds", FieldValue.arrayRemove(userId)).await()
         }
     }
 
@@ -215,7 +229,8 @@ class FirebaseMessagesRepository : MessagesRepository {
                 "lastMessage" to text,
                 "lastMessageSenderId" to senderId,
                 "updatedAt" to nowMillis,
-                "unreadCountByUser" to unreadMap
+                "unreadCountByUser" to unreadMap,
+                "typingUserIds" to FieldValue.arrayRemove(senderId)
             )
         ).await()
     }
@@ -286,7 +301,8 @@ class FirebaseMessagesRepository : MessagesRepository {
             "unreadCountByUser" to mapOf(
                 currentUserId to 0,
                 recipientId to 0
-            )
+            ),
+            "typingUserIds" to emptyList<String>()
         )
 
         threadsCollection.document(nextId.toString()).set(threadData).await()
@@ -307,7 +323,8 @@ class FirebaseMessagesRepository : MessagesRepository {
                 recipientId to 0
             ),
             updatedAt = nowMillis,
-            lastMessageSenderId = ""
+            lastMessageSenderId = "",
+            typingUserIds = emptyList()
         )
     }
 
@@ -331,6 +348,9 @@ class FirebaseMessagesRepository : MessagesRepository {
             it.key.toString() to ((it.value as? Number)?.toInt() ?: 0)
         }
 
+        val typingUserIds = (data["typingUserIds"] as? List<*>)?.filterIsInstance<String>()
+            ?: emptyList()
+
         val recipientId = participantIds.firstOrNull { it != currentUserId } ?: ""
         val recipientName = participantNames[recipientId] ?: "Unknown user"
 
@@ -344,7 +364,8 @@ class FirebaseMessagesRepository : MessagesRepository {
             participantNames = participantNames,
             unreadCountByUser = unreadMap,
             updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L,
-            lastMessageSenderId = data["lastMessageSenderId"] as? String ?: ""
+            lastMessageSenderId = data["lastMessageSenderId"] as? String ?: "",
+            typingUserIds = typingUserIds
         )
     }
 

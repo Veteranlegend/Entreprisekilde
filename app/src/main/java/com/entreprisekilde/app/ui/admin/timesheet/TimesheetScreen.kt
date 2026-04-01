@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +62,7 @@ import com.entreprisekilde.app.ui.components.BottomNavDestination
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -226,14 +228,33 @@ fun TimesheetScreen(
                     label = "From",
                     value = fromDateFilter,
                     modifier = Modifier.weight(1f),
-                    onDateSelected = { fromDateFilter = it }
+                    minDate = null,
+                    maxDate = toDateParsed,
+                    onDateSelected = { selected ->
+                        fromDateFilter = selected
+
+                        val newFromDate = parseOptionalTimesheetDate(selected)
+                        val currentToDate = parseOptionalTimesheetDate(toDateFilter)
+
+                        if (
+                            newFromDate != null &&
+                            currentToDate != null &&
+                            currentToDate.isBefore(newFromDate)
+                        ) {
+                            toDateFilter = ""
+                        }
+                    }
                 )
 
                 DateFilterField(
                     label = "To",
                     value = toDateFilter,
                     modifier = Modifier.weight(1f),
-                    onDateSelected = { toDateFilter = it }
+                    minDate = fromDateParsed,
+                    maxDate = null,
+                    onDateSelected = { selected ->
+                        toDateFilter = selected
+                    }
                 )
             }
 
@@ -553,22 +574,46 @@ private fun DateFilterField(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
+    minDate: LocalDate? = null,
+    maxDate: LocalDate? = null,
     onDateSelected: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val initialDate = parseOptionalTimesheetDate(value) ?: LocalDate.now()
+    val displayFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val interactionSource = remember { MutableInteractionSource() }
 
-    val datePickerDialog = remember(value) {
-        DatePickerDialog(
+    fun openDatePicker() {
+        val initialDate = parseOptionalTimesheetDate(value)
+            ?: minDate
+            ?: maxDate
+            ?: LocalDate.now()
+
+        val dialog = DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
                 val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
-                onDateSelected(selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                onDateSelected(selectedDate.format(displayFormatter))
             },
             initialDate.year,
             initialDate.monthValue - 1,
             initialDate.dayOfMonth
         )
+
+        minDate?.let {
+            dialog.datePicker.minDate = it
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        }
+
+        maxDate?.let {
+            dialog.datePicker.maxDate = it
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        }
+
+        dialog.show()
     }
 
     Column(modifier = modifier) {
@@ -581,40 +626,60 @@ private fun DateFilterField(
 
         Spacer(modifier = Modifier.height(3.dp))
 
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            textStyle = TextStyle(
-                fontSize = 11.sp,
-                color = Color.Black
-            ),
-            trailingIcon = {
-                Icon(
-                    imageVector = Icons.Outlined.CalendarToday,
-                    contentDescription = "Pick date",
-                    tint = Color(0xFF666666),
-                    modifier = Modifier.size(16.dp)
-                )
-            },
-            placeholder = {
-                Text(
-                    text = "dd/MM/yyyy",
-                    fontSize = 11.sp
-                )
-            },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .clickable { datePickerDialog.show() },
-            shape = RoundedCornerShape(10.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                disabledContainerColor = Color.White
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null
+                ) {
+                    openDatePicker()
+                }
+        ) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = {},
+                readOnly = true,
+                enabled = false,
+                singleLine = true,
+                textStyle = TextStyle(
+                    fontSize = 11.sp,
+                    color = Color.Black
+                ),
+                trailingIcon = {
+                    IconButton(
+                        onClick = { openDatePicker() }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CalendarToday,
+                            contentDescription = "Pick date",
+                            tint = Color(0xFF666666),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                },
+                placeholder = {
+                    Text(
+                        text = "dd/MM/yyyy",
+                        fontSize = 11.sp,
+                        color = Color(0xFF888888)
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White,
+                    disabledTextColor = Color.Black,
+                    disabledPlaceholderColor = Color(0xFF888888),
+                    disabledTrailingIconColor = Color(0xFF666666),
+                    disabledIndicatorColor = Color(0xFFBDBDBD)
+                )
             )
-        )
+        }
     }
 }
 

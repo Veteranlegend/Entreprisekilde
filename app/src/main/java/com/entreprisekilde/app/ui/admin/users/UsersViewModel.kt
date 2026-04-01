@@ -95,11 +95,6 @@ class UsersViewModel(
     fun deleteUser(userId: String, onSuccess: () -> Unit = {}) {
         if (isDeletingUser) return
 
-        if (loggedInUser?.id == userId) {
-            deleteUserErrorMessage = "You cannot delete your own account."
-            return
-        }
-
         viewModelScope.launch {
             isDeletingUser = true
             deleteUserMessage = null
@@ -113,6 +108,10 @@ class UsersViewModel(
 
                     if (selectedUser?.id == userId) {
                         selectedUser = null
+                    }
+
+                    if (loggedInUser?.id == userId) {
+                        loggedInUser = null
                     }
 
                     deleteUserMessage = "User deleted successfully."
