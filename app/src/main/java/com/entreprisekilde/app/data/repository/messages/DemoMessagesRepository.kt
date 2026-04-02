@@ -1,8 +1,15 @@
 package com.entreprisekilde.app.data.repository.messages
 
+import android.net.Uri
 import com.entreprisekilde.app.data.DemoSeedData
 import com.entreprisekilde.app.data.model.messages.ChatMessage
+import com.entreprisekilde.app.data.model.messages.ChatMessage.Companion.MESSAGE_TYPE_IMAGE
+import com.entreprisekilde.app.data.model.messages.ChatMessage.Companion.MESSAGE_TYPE_TEXT
 import com.entreprisekilde.app.data.model.messages.MessageThread
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class DemoMessagesRepository : MessagesRepository {
 
@@ -140,7 +147,7 @@ class DemoMessagesRepository : MessagesRepository {
         val trimmedText = text.trim()
         if (trimmedText.isBlank()) return
 
-        val messages = chatMessages.getOrPut(threadId) { mutableListOf() }
+        val messagesForThread = chatMessages.getOrPut(threadId) { mutableListOf() }
         val allMessages = chatMessages.values.flatten()
 
         val newMessageId =
@@ -152,12 +159,14 @@ class DemoMessagesRepository : MessagesRepository {
             threadId = threadId,
             senderId = senderId,
             text = trimmedText,
-            time = currentTime(),
+            imageUrl = "",
+            messageType = MESSAGE_TYPE_TEXT,
+            time = currentTime(nowMillis),
             createdAt = nowMillis,
             readByUserIds = listOf(senderId)
         )
 
-        messages.add(newMessage)
+        messagesForThread.add(newMessage)
 
         val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
         if (threadIndex != -1) {
@@ -174,6 +183,56 @@ class DemoMessagesRepository : MessagesRepository {
 
             messageThreads[threadIndex] = oldThread.copy(
                 lastMessage = trimmedText,
+                unreadCount = updatedUnreadMap[senderId] ?: 0,
+                unreadCountByUser = updatedUnreadMap,
+                updatedAt = nowMillis,
+                lastMessageSenderId = senderId,
+                deletedForUserIds = emptyList()
+            )
+        }
+    }
+
+    override suspend fun sendImageMessage(
+        threadId: Int,
+        senderId: String,
+        imageUri: Uri
+    ) {
+        val messagesForThread = chatMessages.getOrPut(threadId) { mutableListOf() }
+        val allMessages = chatMessages.values.flatten()
+
+        val newMessageId =
+            ((allMessages.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString()
+        val nowMillis = System.currentTimeMillis()
+
+        val newMessage = ChatMessage(
+            id = newMessageId,
+            threadId = threadId,
+            senderId = senderId,
+            text = "",
+            imageUrl = imageUri.toString(),
+            messageType = MESSAGE_TYPE_IMAGE,
+            time = currentTime(nowMillis),
+            createdAt = nowMillis,
+            readByUserIds = listOf(senderId)
+        )
+
+        messagesForThread.add(newMessage)
+
+        val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
+        if (threadIndex != -1) {
+            val oldThread = messageThreads[threadIndex]
+            val updatedUnreadMap = oldThread.unreadCountByUser.toMutableMap()
+
+            oldThread.participantIds.forEach { participantId ->
+                updatedUnreadMap[participantId] = if (participantId == senderId) {
+                    0
+                } else {
+                    (updatedUnreadMap[participantId] ?: 0) + 1
+                }
+            }
+
+            messageThreads[threadIndex] = oldThread.copy(
+                lastMessage = "📷 Image",
                 unreadCount = updatedUnreadMap[senderId] ?: 0,
                 unreadCountByUser = updatedUnreadMap,
                 updatedAt = nowMillis,
@@ -254,8 +313,11 @@ class DemoMessagesRepository : MessagesRepository {
         return newThread
     }
 
-    private fun currentTime(): String {
-        val now = java.time.LocalTime.now()
-        return now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+    private fun currentTime(nowMillis: Long): String {
+        val localDateTime = LocalDateTime.ofInstant(
+            Instant.ofEpochMilli(nowMillis),
+            ZoneId.systemDefault()
+        )
+        return localDateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
     }
 }

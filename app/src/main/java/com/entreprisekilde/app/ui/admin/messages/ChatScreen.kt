@@ -1,5 +1,9 @@
 package com.entreprisekilde.app.ui.admin.messages
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.SupervisorAccount
 import androidx.compose.material3.Icon
@@ -46,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 import com.entreprisekilde.app.data.model.messages.ChatMessage
 import com.entreprisekilde.app.data.model.messages.MessageThread
 
@@ -56,12 +62,21 @@ fun ChatScreen(
     loggedInUserId: String,
     onBack: () -> Unit = {},
     onSendMessage: (String) -> Unit = {},
+    onSendImage: (Uri) -> Unit = {},
     onMessageTextChanged: (String) -> Unit = {},
     onMarkAsRead: () -> Unit = {},
     onStopTyping: () -> Unit = {}
 ) {
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            onSendImage(uri)
+        }
+    }
 
     val isOtherUserTyping = thread.typingUserIds.any { it != loggedInUserId }
 
@@ -175,6 +190,24 @@ fun ChatScreen(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Bottom
         ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(Color(0xFFE9ECF2), CircleShape)
+                    .clickable {
+                        galleryLauncher.launch("image/*")
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AddPhotoAlternate,
+                    contentDescription = "Choose image",
+                    tint = Color(0xFF5F6B7A)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
             OutlinedTextField(
                 value = messageText,
                 onValueChange = {
@@ -238,13 +271,21 @@ private fun MessageBubble(
                     else Color(0xFFE8E8E8),
                     shape = RoundedCornerShape(20.dp)
                 )
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .padding(10.dp)
         ) {
-            Text(
-                text = message.text,
-                color = if (isFromMe) Color.White else Color(0xFF333333),
-                fontSize = 16.sp
-            )
+            if (message.messageType == ChatMessage.MESSAGE_TYPE_IMAGE && message.imageUrl.isNotBlank()) {
+                Image(
+                    painter = rememberAsyncImagePainter(message.imageUrl),
+                    contentDescription = null,
+                    modifier = Modifier.size(180.dp)
+                )
+            } else {
+                Text(
+                    text = message.text,
+                    color = if (isFromMe) Color.White else Color(0xFF333333),
+                    fontSize = 16.sp
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(4.dp))

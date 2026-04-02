@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.viewmodel
 
+import android.net.Uri
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -177,6 +178,43 @@ class MessagesViewModel(
                 onSuccess()
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to send message."
+            }
+        }
+    }
+
+    fun sendImageMessage(
+        senderId: String,
+        imageUri: Uri,
+        onSuccess: () -> Unit = {}
+    ) {
+        val thread = selectedThread.value ?: return
+        val currentUserId = activeUserId ?: senderId
+
+        viewModelScope.launch {
+            try {
+                repository.sendImageMessage(
+                    threadId = thread.id,
+                    senderId = senderId,
+                    imageUri = imageUri
+                )
+
+                repository.setTypingState(thread.id, senderId, false)
+
+                val updatedThread = repository.findThreadById(
+                    threadId = thread.id,
+                    currentUserId = currentUserId
+                ) ?: thread.copy(
+                    lastMessage = "📷 Image",
+                    updatedAt = System.currentTimeMillis(),
+                    lastMessageSenderId = senderId
+                )
+
+                upsertThreadLocally(updatedThread)
+                selectedThread.value = updatedThread
+
+                onSuccess()
+            } catch (e: Exception) {
+                errorMessage.value = e.message ?: "Failed to send image."
             }
         }
     }

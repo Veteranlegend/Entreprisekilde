@@ -290,6 +290,23 @@ fun AdminAppFlow(
                             }
                         )
                     },
+                    onSendImage = { imageUri ->
+                        val currentUser = loggedInUser ?: return@ChatScreen
+                        val recipientId = thread.recipientId
+                        if (recipientId.isBlank()) return@ChatScreen
+
+                        messagesViewModel.sendImageMessage(
+                            senderId = currentUser.id,
+                            imageUri = imageUri,
+                            onSuccess = {
+                                notificationViewModel.addMessageNotification(
+                                    senderName = currentUser.fullName,
+                                    recipientUserId = recipientId,
+                                    threadId = thread.id
+                                )
+                            }
+                        )
+                    },
                     onMessageTextChanged = { text ->
                         val currentUserId = loggedInUser?.id ?: return@ChatScreen
                         messagesViewModel.onMessageInputChanged(currentUserId, text)

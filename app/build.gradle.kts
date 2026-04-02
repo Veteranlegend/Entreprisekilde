@@ -61,11 +61,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     implementation(platform("com.google.firebase:firebase-bom:32.5.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-storage")
 
     implementation("androidx.compose.material3:material3:1.2.1")
     implementation("androidx.navigation:navigation-compose:2.8.0")

@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.data.repository.messages
 
+import android.net.Uri
 import com.entreprisekilde.app.data.model.messages.ChatMessage
 import com.entreprisekilde.app.data.model.messages.MessageThread
 
@@ -46,6 +47,12 @@ interface MessagesRepository {
         threadId: Int,
         senderId: String,
         text: String
+    )
+
+    suspend fun sendImageMessage(
+        threadId: Int,
+        senderId: String,
+        imageUri: Uri
     )
 
     suspend fun findThreadById(
