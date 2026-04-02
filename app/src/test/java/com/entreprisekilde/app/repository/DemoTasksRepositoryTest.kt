@@ -1,7 +1,8 @@
-package com.entreprisekilde.app.data.repository.tasks
+package com.entreprisekilde.app.repository
 
 import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
+import com.entreprisekilde.app.data.repository.tasks.DemoTasksRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

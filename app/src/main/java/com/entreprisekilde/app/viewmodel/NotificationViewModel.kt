@@ -1,4 +1,4 @@
-package com.entreprisekilde.app.ui.notifications
+package com.entreprisekilde.app.viewmodel
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf

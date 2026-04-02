@@ -1,4 +1,4 @@
-package com.entreprisekilde.app.ui.admin.tasks
+package com.entreprisekilde.app.viewmodel
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf

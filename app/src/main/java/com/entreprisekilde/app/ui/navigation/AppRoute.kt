@@ -11,14 +11,14 @@ import com.entreprisekilde.app.data.repository.notifications.FirebaseNotificatio
 import com.entreprisekilde.app.data.repository.tasks.FirebaseTasksRepository
 import com.entreprisekilde.app.data.repository.timesheet.FirebaseTimesheetRepository
 import com.entreprisekilde.app.data.repository.users.FirebaseUsersRepository
-import com.entreprisekilde.app.ui.admin.messages.MessagesViewModel
-import com.entreprisekilde.app.ui.admin.tasks.TasksViewModel
-import com.entreprisekilde.app.ui.admin.timesheet.TimesheetViewModel
-import com.entreprisekilde.app.ui.admin.users.UsersViewModel
+import com.entreprisekilde.app.viewmodel.MessagesViewModel
+import com.entreprisekilde.app.viewmodel.TasksViewModel
+import com.entreprisekilde.app.viewmodel.TimesheetViewModel
+import com.entreprisekilde.app.viewmodel.UsersViewModel
 import com.entreprisekilde.app.ui.auth.login.LoginScreen
 import com.entreprisekilde.app.ui.navigation.admin.AdminAppFlow
 import com.entreprisekilde.app.ui.navigation.employee.EmployeeAppFlow
-import com.entreprisekilde.app.ui.notifications.NotificationViewModel
+import com.entreprisekilde.app.viewmodel.NotificationViewModel
 
 @Composable
 fun EntreprisekildeApp() {
