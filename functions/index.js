@@ -9,6 +9,62 @@ setGlobalOptions({ maxInstances: 10 });
 
 const db = admin.firestore();
 
+function getValidTokens(userDoc) {
+  const singleToken = userDoc.get("fcmToken");
+  const tokenArray = userDoc.get("fcmTokens");
+
+  const tokens = [];
+
+  if (typeof singleToken === "string" && singleToken.trim() !== "") {
+    tokens.push(singleToken.trim());
+  }
+
+  if (Array.isArray(tokenArray)) {
+    for (const token of tokenArray) {
+      if (typeof token === "string" && token.trim() !== "") {
+        tokens.push(token.trim());
+      }
+    }
+  }
+
+  return [...new Set(tokens)];
+}
+
+async function removeInvalidTokens(userId, invalidTokens) {
+  if (!userId || !Array.isArray(invalidTokens) || invalidTokens.length === 0) return;
+
+  const userRef = db.collection("users").doc(userId);
+  const userDoc = await userRef.get();
+
+  if (!userDoc.exists) return;
+
+  const currentSingleToken = userDoc.get("fcmToken");
+  const currentTokenArray = userDoc.get("fcmTokens");
+
+  const cleanedArray = Array.isArray(currentTokenArray)
+    ? currentTokenArray.filter(
+        (token) =>
+          typeof token === "string" &&
+          token.trim() !== "" &&
+          !invalidTokens.includes(token.trim())
+      )
+    : [];
+
+  const updates = {
+    fcmTokens: cleanedArray,
+  };
+
+  if (
+    typeof currentSingleToken === "string" &&
+    currentSingleToken.trim() !== "" &&
+    invalidTokens.includes(currentSingleToken.trim())
+  ) {
+    updates.fcmToken = cleanedArray.length > 0 ? cleanedArray[0] : admin.firestore.FieldValue.delete();
+  }
+
+  await userRef.set(updates, { merge: true });
+}
+
 async function sendNotificationToUser(userId, title, body, data = {}) {
   if (!userId) return;
 
@@ -18,15 +74,16 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
     return;
   }
 
-  const token = userDoc.get("fcmToken");
-  if (!token || typeof token !== "string" || token.trim() === "") {
-    logger.warn(`User ${userId} has no fcmToken`);
+  const tokens = getValidTokens(userDoc);
+
+  if (tokens.length === 0) {
+    logger.warn(`User ${userId} has no valid FCM tokens`);
     return;
   }
 
   try {
-    const response = await admin.messaging().send({
-      token,
+    const response = await admin.messaging().sendEachForMulticast({
+      tokens,
       notification: {
         title,
         body,
@@ -43,21 +100,38 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
       },
     });
 
-    logger.info(`Notification sent to ${userId}`, { response });
+    logger.info(`Notification send result for ${userId}`, {
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      tokensCount: tokens.length,
+    });
+
+    const invalidTokens = [];
+
+    response.responses.forEach((result, index) => {
+      if (!result.success) {
+        const errorCode = result.error?.code || "";
+        logger.error(`Failed token for user ${userId}`, {
+          token: tokens[index],
+          code: errorCode,
+          message: result.error?.message || "Unknown error",
+        });
+
+        if (
+          errorCode === "messaging/invalid-registration-token" ||
+          errorCode === "messaging/registration-token-not-registered"
+        ) {
+          invalidTokens.push(tokens[index]);
+        }
+      }
+    });
+
+    if (invalidTokens.length > 0) {
+      await removeInvalidTokens(userId, invalidTokens);
+      logger.warn(`Removed invalid tokens for user ${userId}`, { invalidTokens });
+    }
   } catch (error) {
     logger.error(`Failed to send notification to ${userId}`, error);
-
-    const code = error?.code || "";
-    if (
-      code === "messaging/invalid-registration-token" ||
-      code === "messaging/registration-token-not-registered"
-    ) {
-      await db.collection("users").doc(userId).set(
-        { fcmToken: admin.firestore.FieldValue.delete() },
-        { merge: true }
-      );
-      logger.warn(`Removed invalid token for user ${userId}`);
-    }
   }
 }
 
@@ -83,10 +157,18 @@ exports.sendMessageNotification = onDocumentCreated(
         ? thread.participantNames
         : {};
 
-    const senderId = typeof message.senderId === "string" ? message.senderId : "";
+    const senderId = typeof message.senderId === "string" ? message.senderId.trim() : "";
     const text = typeof message.text === "string" ? message.text.trim() : "";
 
-    const recipientId = participantIds.find((id) => id !== senderId);
+    if (!senderId) {
+      logger.warn(`Message ${event.params.messageId} in thread ${threadId} has no senderId`);
+      return;
+    }
+
+    const recipientId = participantIds.find(
+      (id) => typeof id === "string" && id.trim() !== "" && id.trim() !== senderId
+    );
+
     if (!recipientId) {
       logger.warn(`No recipient found for thread ${threadId}`);
       return;
@@ -94,7 +176,7 @@ exports.sendMessageNotification = onDocumentCreated(
 
     const senderName =
       typeof participantNames[senderId] === "string" && participantNames[senderId].trim() !== ""
-        ? participantNames[senderId]
+        ? participantNames[senderId].trim()
         : "New message";
 
     await sendNotificationToUser(
@@ -104,7 +186,8 @@ exports.sendMessageNotification = onDocumentCreated(
       {
         type: "chat",
         threadId,
-        senderId,
+        senderUserId: senderId,
+        recipientUserId: recipientId,
       }
     );
   }
@@ -121,6 +204,7 @@ exports.sendTaskAssignedNotificationOnCreate = onDocumentCreated(
 
     const assignedUserId =
       typeof task.assignedUserId === "string" ? task.assignedUserId.trim() : "";
+
     if (!assignedUserId) {
       logger.warn(`Task ${taskId} has no assignedUserId`);
       return;
@@ -143,7 +227,8 @@ exports.sendTaskAssignedNotificationOnCreate = onDocumentCreated(
       {
         type: "task",
         taskId,
-        assignedUserId,
+        senderUserId: "system",
+        recipientUserId: assignedUserId,
       }
     );
   }
@@ -182,7 +267,8 @@ exports.sendTaskAssignedNotificationOnUpdate = onDocumentUpdated(
       {
         type: "task",
         taskId,
-        assignedUserId: afterAssigned,
+        senderUserId: "system",
+        recipientUserId: afterAssigned,
       }
     );
   }

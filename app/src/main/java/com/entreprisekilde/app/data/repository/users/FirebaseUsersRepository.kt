@@ -15,6 +15,9 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
@@ -168,7 +171,19 @@ class FirebaseUsersRepository : UserRepository {
     }
 
     override fun logout() {
-        auth.signOut()
+        val currentUserId = auth.currentUser?.uid
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (!currentUserId.isNullOrBlank()) {
+                    FcmTokenManager.removeCurrentTokenFromUser(currentUserId)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                auth.signOut()
+            }
+        }
     }
 
     override suspend fun getUsers(): List<User> {

@@ -1,4 +1,5 @@
 package com.entreprisekilde.app.notifications
+
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -16,6 +17,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.entreprisekilde.app.MainActivity
 import com.entreprisekilde.app.R
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -46,12 +48,38 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
         Log.d("FCM", "Notification body: ${message.notification?.body}")
         Log.d("FCM", "Data payload: ${message.data}")
 
-        val title = message.notification?.title
-            ?: message.data["title"]
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+
+        val senderUserId = message.data["senderUserId"]
+            ?: message.data["senderId"]
+            ?: ""
+
+        val recipientUserId = message.data["recipientUserId"]
+            ?: message.data["targetUserId"]
+            ?: message.data["userId"]
+            ?: ""
+
+        if (currentUserId.isBlank()) {
+            Log.d("FCM", "No logged in user. Ignoring push notification.")
+            return
+        }
+
+        if (senderUserId.isNotBlank() && senderUserId == currentUserId) {
+            Log.d("FCM", "Ignoring self-sent push notification.")
+            return
+        }
+
+        if (recipientUserId.isNotBlank() && recipientUserId != currentUserId) {
+            Log.d("FCM", "Push notification is not for current user. Ignoring.")
+            return
+        }
+
+        val title = message.data["title"]
+            ?: message.notification?.title
             ?: "Entreprisekilde"
 
-        val body = message.notification?.body
-            ?: message.data["body"]
+        val body = message.data["body"]
+            ?: message.notification?.body
             ?: "You have a new notification"
 
         showNotification(title, body)
