@@ -20,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,21 +36,21 @@ import com.entreprisekilde.app.ui.admin.calendar.CalendarScreen
 import com.entreprisekilde.app.ui.admin.dashboard.AdminDashboardScreen
 import com.entreprisekilde.app.ui.admin.messages.ChatScreen
 import com.entreprisekilde.app.ui.admin.messages.MessagesScreen
-import com.entreprisekilde.app.viewmodel.MessagesViewModel
 import com.entreprisekilde.app.ui.admin.profile.ProfileScreen
 import com.entreprisekilde.app.ui.admin.tasks.CreateTaskScreen
 import com.entreprisekilde.app.ui.admin.tasks.TaskDetailsScreen
 import com.entreprisekilde.app.ui.admin.tasks.TasksScreen
-import com.entreprisekilde.app.viewmodel.TasksViewModel
 import com.entreprisekilde.app.ui.admin.timesheet.TimesheetEmployeeListScreen
 import com.entreprisekilde.app.ui.admin.timesheet.TimesheetScreen
-import com.entreprisekilde.app.viewmodel.TimesheetViewModel
 import com.entreprisekilde.app.ui.admin.viewmodel.CreateUserScreen
 import com.entreprisekilde.app.ui.admin.viewmodel.EmployeeScreen
 import com.entreprisekilde.app.ui.admin.viewmodel.UserDetailsScreen
-import com.entreprisekilde.app.viewmodel.UsersViewModel
 import com.entreprisekilde.app.ui.notifications.NotificationScreen
+import com.entreprisekilde.app.viewmodel.MessagesViewModel
 import com.entreprisekilde.app.viewmodel.NotificationViewModel
+import com.entreprisekilde.app.viewmodel.TasksViewModel
+import com.entreprisekilde.app.viewmodel.TimesheetViewModel
+import com.entreprisekilde.app.viewmodel.UsersViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -72,6 +73,24 @@ fun AdminAppFlow(
     val tasks = tasksViewModel.tasks
     val selectedUser = usersViewModel.selectedUser
     val loggedInUser = usersViewModel.loggedInUser
+
+    LaunchedEffect(loggedInUser?.id) {
+        val currentUserId = loggedInUser?.id
+        if (!currentUserId.isNullOrBlank()) {
+            messagesViewModel.startListeningForUser(currentUserId)
+            notificationViewModel.startListeningForUser(currentUserId)
+        } else {
+            messagesViewModel.stopListening()
+            notificationViewModel.stopListening()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            messagesViewModel.stopListening()
+            notificationViewModel.stopListening()
+        }
+    }
 
     val taskAssignedUsers = users
         .filter { it.id.isNotBlank() }
@@ -229,8 +248,8 @@ fun AdminAppFlow(
                 onNewChatClick = {
                     showNewChatDialog.value = true
                 },
-                onDeleteThread = {
-                    messagesViewModel.deleteThread(it)
+                onDeleteThread = { thread ->
+                    messagesViewModel.deleteThread(thread)
                 },
                 onBack = goToDashboard,
                 onHomeClick = goToDashboard,
@@ -270,6 +289,18 @@ fun AdminAppFlow(
                                 )
                             }
                         )
+                    },
+                    onMessageTextChanged = { text ->
+                        val currentUserId = loggedInUser?.id ?: return@ChatScreen
+                        messagesViewModel.onMessageInputChanged(currentUserId, text)
+                    },
+                    onMarkAsRead = {
+                        val currentUserId = loggedInUser?.id ?: return@ChatScreen
+                        messagesViewModel.markCurrentThreadAsRead(currentUserId)
+                    },
+                    onStopTyping = {
+                        val currentUserId = loggedInUser?.id ?: return@ChatScreen
+                        messagesViewModel.clearTypingState(currentUserId)
                     }
                 )
             } else {
@@ -569,6 +600,8 @@ fun AdminAppFlow(
                 onLogoutClick = {
                     selectedTaskId.value = null
                     cachedSelectedTask.value = null
+                    messagesViewModel.stopListening()
+                    notificationViewModel.stopListening()
                     usersViewModel.logout()
                 },
                 onHomeClick = goToDashboard,
@@ -595,7 +628,9 @@ fun AdminAppFlow(
                             NotificationType.MESSAGE -> {
                                 val threadId = notification.relatedThreadId
                                 val currentUser = loggedInUser
-                                if (threadId != null && currentUser != null &&
+                                if (
+                                    threadId != null &&
+                                    currentUser != null &&
                                     messagesViewModel.selectThreadById(
                                         threadId = threadId,
                                         currentUserId = currentUser.id
@@ -618,7 +653,10 @@ fun AdminAppFlow(
                 },
                 onHomeClick = goToDashboard,
                 onMessagesClick = goToMessages,
-                onProfileClick = goToProfile
+                onProfileClick = goToProfile,
+                onScreenClosed = {
+                    notificationViewModel.setNotificationsScreenOpen(false)
+                }
             )
         }
     }

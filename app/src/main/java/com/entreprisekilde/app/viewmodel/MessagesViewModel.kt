@@ -40,7 +40,13 @@ class MessagesViewModel(
                 val selectedId = selectedThread.value?.id
                 if (selectedId != null) {
                     val updatedSelected = threads.find { it.id == selectedId }
-                    selectedThread.value = updatedSelected
+                    if (updatedSelected != null) {
+                        selectedThread.value = updatedSelected
+                    } else if (selectedThread.value?.id == selectedId) {
+                        selectedThread.value = null
+                        currentMessages.clear()
+                        stopListeningToMessages()
+                    }
                 }
             },
             onError = { message ->
@@ -62,6 +68,7 @@ class MessagesViewModel(
             }
         }
 
+        typingStopJob?.cancel()
         activeUserId = null
         stopListeningToThreads()
         stopListeningToMessages()
@@ -75,7 +82,7 @@ class MessagesViewModel(
         currentUserId: String
     ) {
         selectedThread.value = thread
-        startListeningToMessages(thread.id)
+        startListeningToMessages(thread.id, currentUserId)
         markCurrentThreadAsRead(currentUserId)
     }
 
@@ -106,7 +113,7 @@ class MessagesViewModel(
 
                 upsertThreadLocally(thread)
                 selectedThread.value = thread
-                startListeningToMessages(thread.id)
+                startListeningToMessages(thread.id, currentUserId)
 
                 onReady(thread)
             } catch (e: Exception) {
@@ -116,9 +123,11 @@ class MessagesViewModel(
     }
 
     fun deleteThread(thread: MessageThread) {
+        val currentUserId = activeUserId ?: return
+
         viewModelScope.launch {
             try {
-                repository.deleteThread(thread.id)
+                repository.deleteThread(thread.id, currentUserId)
 
                 messageThreads.removeAll { it.id == thread.id }
 
@@ -157,7 +166,7 @@ class MessagesViewModel(
                     threadId = thread.id,
                     currentUserId = currentUserId
                 ) ?: thread.copy(
-                    lastMessage = message,
+                    lastMessage = message.trim(),
                     updatedAt = System.currentTimeMillis(),
                     lastMessageSenderId = senderId
                 )
@@ -177,8 +186,8 @@ class MessagesViewModel(
 
         viewModelScope.launch {
             try {
-                repository.markThreadAsRead(thread.id, currentUserId)
                 repository.markMessagesAsRead(thread.id, currentUserId)
+                repository.markThreadAsRead(thread.id, currentUserId)
 
                 val updatedThread = repository.findThreadById(thread.id, currentUserId)
                 if (updatedThread != null) {
@@ -206,6 +215,7 @@ class MessagesViewModel(
         }
 
         typingStopJob?.cancel()
+
         if (text.isNotBlank()) {
             typingStopJob = viewModelScope.launch {
                 delay(2000)
@@ -233,7 +243,7 @@ class MessagesViewModel(
         }
     }
 
-    private fun startListeningToMessages(threadId: Int) {
+    private fun startListeningToMessages(threadId: Int, currentUserId: String) {
         stopListeningToMessages()
 
         removeMessagesListener = repository.startMessagesListener(
@@ -241,6 +251,20 @@ class MessagesViewModel(
             onUpdate = { messages ->
                 currentMessages.clear()
                 currentMessages.addAll(messages)
+
+                viewModelScope.launch {
+                    try {
+                        repository.markMessagesAsRead(threadId, currentUserId)
+                        repository.markThreadAsRead(threadId, currentUserId)
+
+                        val updatedThread = repository.findThreadById(threadId, currentUserId)
+                        if (updatedThread != null && selectedThread.value?.id == threadId) {
+                            selectedThread.value = updatedThread
+                            upsertThreadLocally(updatedThread)
+                        }
+                    } catch (_: Exception) {
+                    }
+                }
             },
             onError = { message ->
                 errorMessage.value = message

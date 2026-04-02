@@ -13,33 +13,13 @@ class DemoMessagesRepository : MessagesRepository {
 
     override suspend fun getThreadsForUser(userId: String): List<MessageThread> {
         return messageThreads
-            .filter { it.participantIds.contains(userId) }
+            .filter { it.participantIds.contains(userId) && !it.deletedForUserIds.contains(userId) }
+            .map { thread ->
+                thread.copy(unreadCount = thread.unreadCountByUser[userId] ?: 0)
+            }
             .sortedByDescending { it.updatedAt }
     }
 
-    override suspend fun setTypingState(
-        threadId: Int,
-        userId: String,
-        isTyping: Boolean
-    ) {
-        val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
-        if (threadIndex == -1) return
-
-        val oldThread = messageThreads[threadIndex]
-        val updatedTypingUsers = oldThread.typingUserIds.toMutableList()
-
-        if (isTyping) {
-            if (!updatedTypingUsers.contains(userId)) {
-                updatedTypingUsers.add(userId)
-            }
-        } else {
-            updatedTypingUsers.remove(userId)
-        }
-
-        messageThreads[threadIndex] = oldThread.copy(
-            typingUserIds = updatedTypingUsers
-        )
-    }
     override fun startThreadsListener(
         userId: String,
         onUpdate: (List<MessageThread>) -> Unit,
@@ -47,7 +27,10 @@ class DemoMessagesRepository : MessagesRepository {
     ): () -> Unit {
         onUpdate(
             messageThreads
-                .filter { it.participantIds.contains(userId) }
+                .filter { it.participantIds.contains(userId) && !it.deletedForUserIds.contains(userId) }
+                .map { thread ->
+                    thread.copy(unreadCount = thread.unreadCountByUser[userId] ?: 0)
+                }
                 .sortedByDescending { it.updatedAt }
         )
         return {}
@@ -106,9 +89,47 @@ class DemoMessagesRepository : MessagesRepository {
         }.toMutableList()
     }
 
-    override suspend fun deleteThread(threadId: Int) {
-        messageThreads.removeAll { it.id == threadId }
-        chatMessages.remove(threadId)
+    override suspend fun setTypingState(
+        threadId: Int,
+        userId: String,
+        isTyping: Boolean
+    ) {
+        val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
+        if (threadIndex == -1) return
+
+        val oldThread = messageThreads[threadIndex]
+        val updatedTypingUsers = oldThread.typingUserIds.toMutableList()
+
+        if (isTyping) {
+            if (!updatedTypingUsers.contains(userId)) {
+                updatedTypingUsers.add(userId)
+            }
+        } else {
+            updatedTypingUsers.remove(userId)
+        }
+
+        messageThreads[threadIndex] = oldThread.copy(
+            typingUserIds = updatedTypingUsers
+        )
+    }
+
+    override suspend fun deleteThread(
+        threadId: Int,
+        currentUserId: String
+    ) {
+        val threadIndex = messageThreads.indexOfFirst { it.id == threadId }
+        if (threadIndex == -1) return
+
+        val oldThread = messageThreads[threadIndex]
+        val updatedDeletedForUserIds = oldThread.deletedForUserIds.toMutableList()
+
+        if (!updatedDeletedForUserIds.contains(currentUserId)) {
+            updatedDeletedForUserIds.add(currentUserId)
+        }
+
+        messageThreads[threadIndex] = oldThread.copy(
+            deletedForUserIds = updatedDeletedForUserIds
+        )
     }
 
     override suspend fun sendMessage(
@@ -116,17 +137,21 @@ class DemoMessagesRepository : MessagesRepository {
         senderId: String,
         text: String
     ) {
+        val trimmedText = text.trim()
+        if (trimmedText.isBlank()) return
+
         val messages = chatMessages.getOrPut(threadId) { mutableListOf() }
         val allMessages = chatMessages.values.flatten()
 
-        val newMessageId = ((allMessages.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString()
+        val newMessageId =
+            ((allMessages.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString()
         val nowMillis = System.currentTimeMillis()
 
         val newMessage = ChatMessage(
             id = newMessageId,
             threadId = threadId,
             senderId = senderId,
-            text = text,
+            text = trimmedText,
             time = currentTime(),
             createdAt = nowMillis,
             readByUserIds = listOf(senderId)
@@ -148,11 +173,12 @@ class DemoMessagesRepository : MessagesRepository {
             }
 
             messageThreads[threadIndex] = oldThread.copy(
-                lastMessage = text,
+                lastMessage = trimmedText,
                 unreadCount = updatedUnreadMap[senderId] ?: 0,
                 unreadCountByUser = updatedUnreadMap,
                 updatedAt = nowMillis,
-                lastMessageSenderId = senderId
+                lastMessageSenderId = senderId,
+                deletedForUserIds = emptyList()
             )
         }
     }
@@ -162,6 +188,8 @@ class DemoMessagesRepository : MessagesRepository {
         currentUserId: String
     ): MessageThread? {
         val thread = messageThreads.firstOrNull { it.id == threadId } ?: return null
+        if (thread.deletedForUserIds.contains(currentUserId)) return null
+
         return thread.copy(
             unreadCount = thread.unreadCountByUser[currentUserId] ?: 0
         )
@@ -174,12 +202,25 @@ class DemoMessagesRepository : MessagesRepository {
         recipientName: String
     ): MessageThread {
         val existingThread = messageThreads.firstOrNull { thread ->
-            thread.participantIds.contains(currentUserId) && thread.participantIds.contains(recipientId)
+            thread.participantIds.size == 2 &&
+                    thread.participantIds.contains(currentUserId) &&
+                    thread.participantIds.contains(recipientId)
         }
 
         if (existingThread != null) {
-            return existingThread.copy(
-                unreadCount = existingThread.unreadCountByUser[currentUserId] ?: 0
+            val threadIndex = messageThreads.indexOfFirst { it.id == existingThread.id }
+            if (threadIndex != -1) {
+                val oldThread = messageThreads[threadIndex]
+                val updatedDeletedForUserIds = oldThread.deletedForUserIds.filter { it != currentUserId }
+
+                messageThreads[threadIndex] = oldThread.copy(
+                    deletedForUserIds = updatedDeletedForUserIds
+                )
+            }
+
+            val updatedThread = messageThreads.first { it.id == existingThread.id }
+            return updatedThread.copy(
+                unreadCount = updatedThread.unreadCountByUser[currentUserId] ?: 0
             )
         }
 
@@ -202,7 +243,9 @@ class DemoMessagesRepository : MessagesRepository {
                 recipientId to 0
             ),
             updatedAt = nowMillis,
-            lastMessageSenderId = ""
+            lastMessageSenderId = "",
+            typingUserIds = emptyList(),
+            deletedForUserIds = emptyList()
         )
 
         messageThreads.add(newThread)

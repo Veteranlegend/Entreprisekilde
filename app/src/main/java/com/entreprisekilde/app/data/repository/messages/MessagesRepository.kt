@@ -37,7 +37,10 @@ interface MessagesRepository {
         isTyping: Boolean
     )
 
-    suspend fun deleteThread(threadId: Int)
+    suspend fun deleteThread(
+        threadId: Int,
+        currentUserId: String
+    )
 
     suspend fun sendMessage(
         threadId: Int,

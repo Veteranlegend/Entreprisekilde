@@ -27,6 +27,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -52,10 +53,17 @@ fun NotificationScreen(
     onDeleteNotification: (AppNotification) -> Unit = {},
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {}
+    onProfileClick: () -> Unit = {},
+    onScreenClosed: () -> Unit = {}
 ) {
     LaunchedEffect(Unit) {
         onScreenOpened()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            onScreenClosed()
+        }
     }
 
     Column(

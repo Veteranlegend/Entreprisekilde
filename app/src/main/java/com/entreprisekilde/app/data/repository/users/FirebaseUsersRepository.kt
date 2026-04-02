@@ -2,6 +2,7 @@ package com.entreprisekilde.app.data.repository.users
 
 import com.entreprisekilde.app.data.model.auth.LoginResult
 import com.entreprisekilde.app.data.model.users.User
+import com.entreprisekilde.app.notifications.FcmTokenManager
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.FirebaseTooManyRequestsException
@@ -12,6 +13,7 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -62,6 +64,8 @@ class FirebaseUsersRepository : UserRepository {
                     )
                 }
 
+                FcmTokenManager.syncCurrentTokenToLoggedInUser()
+
                 LoginResult.Success(user)
             } else {
                 val users = getUsers()
@@ -93,6 +97,8 @@ class FirebaseUsersRepository : UserRepository {
                     matchedUser
                 }
 
+                FcmTokenManager.syncCurrentTokenToLoggedInUser()
+
                 LoginResult.Success(latestUser)
             }
         } catch (e: FirebaseTooManyRequestsException) {
@@ -110,7 +116,6 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
-
     override suspend fun deleteUser(userId: String): Result<Unit> {
         return try {
             firestore.collection("users")
@@ -124,6 +129,7 @@ class FirebaseUsersRepository : UserRepository {
             Result.failure(Exception("Failed to delete user."))
         }
     }
+
     override suspend fun getUserById(userId: String): User? {
         return try {
             val doc = firestore.collection("users")
@@ -306,7 +312,7 @@ class FirebaseUsersRepository : UserRepository {
 
             firestore.collection("users")
                 .document(updatedUser.id)
-                .set(userData)
+                .set(userData, SetOptions.merge())
                 .await()
 
             Result.success(Unit)

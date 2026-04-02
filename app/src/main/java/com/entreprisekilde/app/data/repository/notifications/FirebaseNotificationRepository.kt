@@ -14,16 +14,19 @@ class FirebaseNotificationRepository(
     private var listenerRegistration: ListenerRegistration? = null
 
     override suspend fun getNotifications(userId: String): List<AppNotification> {
-        return notificationsCollection
-            .whereEqualTo("userId", userId)
-            .orderBy("createdAt")
-            .get()
-            .await()
-            .documents
-            .mapNotNull { document ->
-                document.toObject(AppNotification::class.java)?.copy(id = document.id)
-            }
-            .reversed()
+        return try {
+            notificationsCollection
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { document ->
+                    document.toObject(AppNotification::class.java)?.copy(id = document.id)
+                }
+                .sortedByDescending { it.createdAt }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     override fun observeNotifications(
@@ -35,22 +38,20 @@ class FirebaseNotificationRepository(
 
         listenerRegistration = notificationsCollection
             .whereEqualTo("userId", userId)
-            .orderBy("createdAt")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     onError(error)
                     return@addSnapshotListener
                 }
 
-                if (snapshot != null) {
-                    val notifications = snapshot.documents
-                        .mapNotNull { document ->
-                            document.toObject(AppNotification::class.java)?.copy(id = document.id)
-                        }
-                        .reversed()
+                val updatedNotifications = snapshot?.documents
+                    ?.mapNotNull { document ->
+                        document.toObject(AppNotification::class.java)?.copy(id = document.id)
+                    }
+                    ?.sortedByDescending { it.createdAt }
+                    ?: emptyList()
 
-                    onChanged(notifications)
-                }
+                onChanged(updatedNotifications)
             }
     }
 
@@ -64,6 +65,8 @@ class FirebaseNotificationRepository(
         recipientUserId: String,
         threadId: Int
     ) {
+        if (recipientUserId.isBlank()) return
+
         val notification = AppNotification(
             userId = recipientUserId,
             title = "New message",
@@ -82,6 +85,8 @@ class FirebaseNotificationRepository(
         assignedUserId: String,
         assignedToName: String
     ) {
+        if (assignedUserId.isBlank()) return
+
         val notification = AppNotification(
             userId = assignedUserId,
             title = "Task assigned",
@@ -105,7 +110,6 @@ class FirebaseNotificationRepository(
     override suspend fun markAllAsRead(userId: String) {
         val snapshot = notificationsCollection
             .whereEqualTo("userId", userId)
-            .whereEqualTo("isRead", false)
             .get()
             .await()
 
@@ -114,19 +118,26 @@ class FirebaseNotificationRepository(
         val batch = firestore.batch()
 
         snapshot.documents.forEach { document ->
-            batch.update(document.reference, "isRead", true)
+            val isRead = document.getBoolean("isRead") ?: false
+            if (!isRead) {
+                batch.update(document.reference, "isRead", true)
+            }
         }
 
         batch.commit().await()
     }
 
     override suspend fun unreadCount(userId: String): Int {
-        return notificationsCollection
-            .whereEqualTo("userId", userId)
-            .whereEqualTo("isRead", false)
-            .get()
-            .await()
-            .size()
+        return try {
+            notificationsCollection
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+                .documents
+                .count { !(it.getBoolean("isRead") ?: false) }
+        } catch (e: Exception) {
+            0
+        }
     }
 
     override suspend fun deleteNotification(notificationId: String) {

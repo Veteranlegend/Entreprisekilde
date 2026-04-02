@@ -21,13 +21,15 @@ class FirebaseMessagesRepository : MessagesRepository {
         return try {
             val snapshot = threadsCollection
                 .whereArrayContains("participantIds", userId)
-                .orderBy("updatedAt", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
-            snapshot.documents.mapNotNull { doc ->
-                mapThreadDocument(doc.id, doc.data, userId)
-            }
+            snapshot.documents
+                .mapNotNull { doc ->
+                    mapThreadDocument(doc.id, doc.data, userId)
+                }
+                .filter { !it.deletedForUserIds.contains(userId) }
+                .sortedByDescending { it.updatedAt }
         } catch (e: Exception) {
             emptyList()
         }
@@ -40,16 +42,19 @@ class FirebaseMessagesRepository : MessagesRepository {
     ): () -> Unit {
         val registration: ListenerRegistration = threadsCollection
             .whereArrayContains("participantIds", userId)
-            .orderBy("updatedAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     onError(error.message ?: "Failed to listen for threads.")
                     return@addSnapshotListener
                 }
 
-                val threads = snapshot?.documents?.mapNotNull { doc ->
-                    mapThreadDocument(doc.id, doc.data, userId)
-                } ?: emptyList()
+                val threads = snapshot?.documents
+                    ?.mapNotNull { doc ->
+                        mapThreadDocument(doc.id, doc.data, userId)
+                    }
+                    ?.filter { !it.deletedForUserIds.contains(userId) }
+                    ?.sortedByDescending { it.updatedAt }
+                    ?: emptyList()
 
                 onUpdate(threads)
             }
@@ -160,7 +165,8 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         snapshot.documents.forEach { document ->
             val senderId = document.getString("senderId") ?: ""
-            val readBy = document.get("readByUserIds") as? List<*> ?: emptyList<Any>()
+            val readBy = (document.get("readByUserIds") as? List<*>)?.filterIsInstance<String>()
+                ?: emptyList()
 
             if (senderId != userId && !readBy.contains(userId)) {
                 batch.update(document.reference, "readByUserIds", FieldValue.arrayUnion(userId))
@@ -187,11 +193,25 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    override suspend fun deleteThread(
+        threadId: Int,
+        currentUserId: String
+    ) {
+        val threadRef = threadsCollection.document(threadId.toString())
+        threadRef.update(
+            "deletedForUserIds",
+            FieldValue.arrayUnion(currentUserId)
+        ).await()
+    }
+
     override suspend fun sendMessage(
         threadId: Int,
         senderId: String,
         text: String
     ) {
+        val trimmedText = text.trim()
+        if (trimmedText.isBlank()) return
+
         val threadRef = threadsCollection.document(threadId.toString())
         val threadSnapshot = threadRef.get().await()
         val threadData = threadSnapshot.data ?: return
@@ -216,7 +236,7 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         val messageData = hashMapOf(
             "senderId" to senderId,
-            "text" to text,
+            "text" to trimmedText,
             "time" to currentTime(nowMillis),
             "createdAt" to nowMillis,
             "readByUserIds" to listOf(senderId)
@@ -226,24 +246,14 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         threadRef.update(
             mapOf(
-                "lastMessage" to text,
+                "lastMessage" to trimmedText,
                 "lastMessageSenderId" to senderId,
                 "updatedAt" to nowMillis,
                 "unreadCountByUser" to unreadMap,
-                "typingUserIds" to FieldValue.arrayRemove(senderId)
+                "typingUserIds" to FieldValue.arrayRemove(senderId),
+                "deletedForUserIds" to emptyList<String>()
             )
         ).await()
-    }
-
-    override suspend fun deleteThread(threadId: Int) {
-        val threadRef = threadsCollection.document(threadId.toString())
-        val messages = threadRef.collection("messages").get().await()
-
-        for (doc in messages.documents) {
-            doc.reference.delete().await()
-        }
-
-        threadRef.delete().await()
     }
 
     override suspend fun findThreadById(
@@ -254,7 +264,8 @@ class FirebaseMessagesRepository : MessagesRepository {
             val doc = threadsCollection.document(threadId.toString()).get().await()
             if (!doc.exists()) return null
 
-            mapThreadDocument(doc.id, doc.data, currentUserId)
+            val mapped = mapThreadDocument(doc.id, doc.data, currentUserId)
+            if (mapped?.deletedForUserIds?.contains(currentUserId) == true) null else mapped
         } catch (e: Exception) {
             null
         }
@@ -274,13 +285,24 @@ class FirebaseMessagesRepository : MessagesRepository {
         val existing = snapshot.documents.firstOrNull { document ->
             val participants = (document.get("participantIds") as? List<*>)?.filterIsInstance<String>()
                 ?: emptyList()
-            participants.contains(recipientId)
+
+            participants.size == 2 &&
+                    participants.contains(currentUserId) &&
+                    participants.contains(recipientId)
         }
 
         if (existing != null) {
+            threadsCollection.document(existing.id)
+                .update("deletedForUserIds", FieldValue.arrayRemove(currentUserId))
+                .await()
+
             return mapThreadDocument(
                 docId = existing.id,
-                data = existing.data,
+                data = existing.data?.toMutableMap()?.apply {
+                    val oldDeleted = (this["deletedForUserIds"] as? List<*>)?.filterIsInstance<String>()
+                        ?: emptyList()
+                    this["deletedForUserIds"] = oldDeleted.filter { it != currentUserId }
+                },
                 currentUserId = currentUserId
             ) ?: throw IllegalStateException("Failed to map existing thread.")
         }
@@ -302,7 +324,8 @@ class FirebaseMessagesRepository : MessagesRepository {
                 currentUserId to 0,
                 recipientId to 0
             ),
-            "typingUserIds" to emptyList<String>()
+            "typingUserIds" to emptyList<String>(),
+            "deletedForUserIds" to emptyList<String>()
         )
 
         threadsCollection.document(nextId.toString()).set(threadData).await()
@@ -324,7 +347,8 @@ class FirebaseMessagesRepository : MessagesRepository {
             ),
             updatedAt = nowMillis,
             lastMessageSenderId = "",
-            typingUserIds = emptyList()
+            typingUserIds = emptyList(),
+            deletedForUserIds = emptyList()
         )
     }
 
@@ -351,6 +375,9 @@ class FirebaseMessagesRepository : MessagesRepository {
         val typingUserIds = (data["typingUserIds"] as? List<*>)?.filterIsInstance<String>()
             ?: emptyList()
 
+        val deletedForUserIds = (data["deletedForUserIds"] as? List<*>)?.filterIsInstance<String>()
+            ?: emptyList()
+
         val recipientId = participantIds.firstOrNull { it != currentUserId } ?: ""
         val recipientName = participantNames[recipientId] ?: "Unknown user"
 
@@ -365,7 +392,8 @@ class FirebaseMessagesRepository : MessagesRepository {
             unreadCountByUser = unreadMap,
             updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L,
             lastMessageSenderId = data["lastMessageSenderId"] as? String ?: "",
-            typingUserIds = typingUserIds
+            typingUserIds = typingUserIds,
+            deletedForUserIds = deletedForUserIds
         )
     }
 
