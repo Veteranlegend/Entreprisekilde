@@ -275,36 +275,18 @@ fun AdminAppFlow(
                     onBack = goToMessages,
                     onSendMessage = { msg ->
                         val currentUser = loggedInUser ?: return@ChatScreen
-                        val recipientId = thread.recipientId
-                        if (recipientId.isBlank()) return@ChatScreen
 
                         messagesViewModel.sendMessage(
                             senderId = currentUser.id,
-                            message = msg,
-                            onSuccess = {
-                                notificationViewModel.addMessageNotification(
-                                    senderName = currentUser.fullName,
-                                    recipientUserId = recipientId,
-                                    threadId = thread.id
-                                )
-                            }
+                            message = msg
                         )
                     },
                     onSendImage = { imageUri ->
                         val currentUser = loggedInUser ?: return@ChatScreen
-                        val recipientId = thread.recipientId
-                        if (recipientId.isBlank()) return@ChatScreen
 
                         messagesViewModel.sendImageMessage(
                             senderId = currentUser.id,
-                            imageUri = imageUri,
-                            onSuccess = {
-                                notificationViewModel.addMessageNotification(
-                                    senderName = currentUser.fullName,
-                                    recipientUserId = recipientId,
-                                    threadId = thread.id
-                                )
-                            }
+                            imageUri = imageUri
                         )
                     },
                     onMessageTextChanged = { text ->
@@ -398,14 +380,6 @@ fun AdminAppFlow(
                 onBack = goToDashboard,
                 onCreateTask = { task ->
                     tasksViewModel.addTask(task.copy(date = normalizeDateForDisplay(task.date)))
-
-                    if (task.assignedUserId.isNotBlank()) {
-                        notificationViewModel.addTaskAssignedNotification(
-                            taskName = task.customer,
-                            assignedUserId = task.assignedUserId,
-                            assignedToName = task.assignTo
-                        )
-                    }
                 },
                 assignedUserOptions = taskAssignedUsers,
                 onHomeClick = goToDashboard,

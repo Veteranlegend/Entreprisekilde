@@ -1,10 +1,12 @@
 package com.entreprisekilde.app.viewmodel
 
+import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.entreprisekilde.app.data.model.auth.LoginResult
 import com.entreprisekilde.app.data.model.users.User
@@ -13,8 +15,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class UsersViewModel(
+    application: Application,
     private val userRepository: UserRepository
-) : ViewModel() {
+) : AndroidViewModel(application) {
+
+    companion object {
+        private const val LOGIN_PREFS = "login_prefs"
+        private const val KEY_LOGGED_IN_USER_ID = "logged_in_user_id"
+    }
+
+    private val prefs = application.getSharedPreferences(LOGIN_PREFS, Context.MODE_PRIVATE)
 
     val users = mutableStateListOf<User>()
 
@@ -82,10 +92,19 @@ class UsersViewModel(
         userRepository.observeAuthState { userId ->
             if (userId == null) {
                 loggedInUser = null
+                clearLoggedInUserIdFromPrefs()
                 isCheckingAuth = false
             } else {
                 viewModelScope.launch {
-                    loggedInUser = userRepository.getUserById(userId)
+                    val user = userRepository.getUserById(userId)
+                    loggedInUser = user
+
+                    if (user != null) {
+                        saveLoggedInUserIdToPrefs(user.id)
+                    } else {
+                        clearLoggedInUserIdFromPrefs()
+                    }
+
                     isCheckingAuth = false
                 }
             }
@@ -112,6 +131,7 @@ class UsersViewModel(
 
                     if (loggedInUser?.id == userId) {
                         loggedInUser = null
+                        clearLoggedInUserIdFromPrefs()
                     }
 
                     deleteUserMessage = "User deleted successfully."
@@ -141,6 +161,7 @@ class UsersViewModel(
             when (val result = userRepository.login(username, password)) {
                 is LoginResult.Success -> {
                     loggedInUser = result.user
+                    saveLoggedInUserIdToPrefs(result.user.id)
                     failedAttempts = 0
                     loginErrorMessage = null
                     loginInfoMessage = null
@@ -246,6 +267,7 @@ class UsersViewModel(
     fun logout() {
         userRepository.logout()
         loggedInUser = null
+        clearLoggedInUserIdFromPrefs()
         loginErrorMessage = null
         loginInfoMessage = null
         isLoading = false
@@ -319,6 +341,7 @@ class UsersViewModel(
 
                     if (loggedInUser?.id == updatedUser.id) {
                         loggedInUser = updatedUser
+                        saveLoggedInUserIdToPrefs(updatedUser.id)
                     }
 
                     updateUserMessage = "User updated successfully."
@@ -339,6 +362,18 @@ class UsersViewModel(
     private suspend fun refreshUsers() {
         users.clear()
         users.addAll(userRepository.getUsers())
+    }
+
+    private fun saveLoggedInUserIdToPrefs(userId: String) {
+        prefs.edit()
+            .putString(KEY_LOGGED_IN_USER_ID, userId)
+            .apply()
+    }
+
+    private fun clearLoggedInUserIdFromPrefs() {
+        prefs.edit()
+            .remove(KEY_LOGGED_IN_USER_ID)
+            .apply()
     }
 
     override fun onCleared() {

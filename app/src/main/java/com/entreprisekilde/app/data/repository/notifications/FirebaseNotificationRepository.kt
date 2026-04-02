@@ -11,17 +11,22 @@ class FirebaseNotificationRepository(
 ) : NotificationRepository {
 
     private val notificationsCollection = firestore.collection("notifications")
+    private val usersCollection = firestore.collection("users")
     private var listenerRegistration: ListenerRegistration? = null
 
     override suspend fun getNotifications(userId: String): List<AppNotification> {
         return try {
+            val lastOpenedAt = getLastNotificationsOpenedAt(userId)
+
             notificationsCollection
                 .whereEqualTo("userId", userId)
                 .get()
                 .await()
                 .documents
                 .mapNotNull { document ->
-                    document.toObject(AppNotification::class.java)?.copy(id = document.id)
+                    document.toObject(AppNotification::class.java)
+                        ?.copy(id = document.id)
+                        ?.markReadUsingLastOpenedAt(lastOpenedAt)
                 }
                 .sortedByDescending { it.createdAt }
         } catch (e: Exception) {
@@ -44,14 +49,26 @@ class FirebaseNotificationRepository(
                     return@addSnapshotListener
                 }
 
-                val updatedNotifications = snapshot?.documents
-                    ?.mapNotNull { document ->
-                        document.toObject(AppNotification::class.java)?.copy(id = document.id)
-                    }
-                    ?.sortedByDescending { it.createdAt }
-                    ?: emptyList()
+                firestore.collection("users")
+                    .document(userId)
+                    .get()
+                    .addOnSuccessListener { userDoc ->
+                        val lastOpenedAt = (userDoc.getLong("lastNotificationsOpenedAt") ?: 0L)
 
-                onChanged(updatedNotifications)
+                        val updatedNotifications = snapshot?.documents
+                            ?.mapNotNull { document ->
+                                document.toObject(AppNotification::class.java)
+                                    ?.copy(id = document.id)
+                                    ?.markReadUsingLastOpenedAt(lastOpenedAt)
+                            }
+                            ?.sortedByDescending { it.createdAt }
+                            ?: emptyList()
+
+                        onChanged(updatedNotifications)
+                    }
+                    .addOnFailureListener { userError ->
+                        onError(userError)
+                    }
             }
     }
 
@@ -108,12 +125,12 @@ class FirebaseNotificationRepository(
     }
 
     override suspend fun markAllAsRead(userId: String) {
+        val now = System.currentTimeMillis()
+
         val snapshot = notificationsCollection
             .whereEqualTo("userId", userId)
             .get()
             .await()
-
-        if (snapshot.isEmpty) return
 
         val batch = firestore.batch()
 
@@ -124,17 +141,29 @@ class FirebaseNotificationRepository(
             }
         }
 
+        batch.set(
+            usersCollection.document(userId),
+            mapOf("lastNotificationsOpenedAt" to now),
+            com.google.firebase.firestore.SetOptions.merge()
+        )
+
         batch.commit().await()
     }
 
     override suspend fun unreadCount(userId: String): Int {
         return try {
+            val lastOpenedAt = getLastNotificationsOpenedAt(userId)
+
             notificationsCollection
                 .whereEqualTo("userId", userId)
                 .get()
                 .await()
                 .documents
-                .count { !(it.getBoolean("isRead") ?: false) }
+                .count { document ->
+                    val isRead = document.getBoolean("isRead") ?: false
+                    val createdAt = document.getLong("createdAt") ?: 0L
+                    !isRead && createdAt > lastOpenedAt
+                }
         } catch (e: Exception) {
             0
         }
@@ -145,5 +174,25 @@ class FirebaseNotificationRepository(
             .document(notificationId)
             .delete()
             .await()
+    }
+
+    private suspend fun getLastNotificationsOpenedAt(userId: String): Long {
+        return try {
+            usersCollection
+                .document(userId)
+                .get()
+                .await()
+                .getLong("lastNotificationsOpenedAt") ?: 0L
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    private fun AppNotification.markReadUsingLastOpenedAt(lastOpenedAt: Long): AppNotification {
+        return if (!isRead && createdAt <= lastOpenedAt) {
+            copy(isRead = true)
+        } else {
+            this
+        }
     }
 }

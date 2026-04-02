@@ -9,16 +9,15 @@ setGlobalOptions({ maxInstances: 10 });
 
 const db = admin.firestore();
 
-function getValidTokens(userDoc) {
-  const singleToken = userDoc.get("fcmToken");
-  const tokenArray = userDoc.get("fcmTokens");
-
+function getAllValidTokens(userDoc) {
   const tokens = [];
 
+  const singleToken = userDoc.get("fcmToken");
   if (typeof singleToken === "string" && singleToken.trim() !== "") {
     tokens.push(singleToken.trim());
   }
 
+  const tokenArray = userDoc.get("fcmTokens");
   if (Array.isArray(tokenArray)) {
     for (const token of tokenArray) {
       if (typeof token === "string" && token.trim() !== "") {
@@ -30,53 +29,55 @@ function getValidTokens(userDoc) {
   return [...new Set(tokens)];
 }
 
-async function removeInvalidTokens(userId, invalidTokens) {
-  if (!userId || !Array.isArray(invalidTokens) || invalidTokens.length === 0) return;
+async function cleanupUserTokens(userId, validTokensToKeep = []) {
+  if (!userId) return;
 
-  const userRef = db.collection("users").doc(userId);
-  const userDoc = await userRef.get();
+  const cleanedTokens = [...new Set(validTokensToKeep.filter(Boolean))];
 
-  if (!userDoc.exists) return;
+  await db.collection("users").doc(userId).set(
+    {
+      fcmToken: cleanedTokens[0] || "",
+      fcmTokens: cleanedTokens,
+      lastTokenUpdatedAt: Date.now(),
+    },
+    { merge: true }
+  );
+}
 
-  const currentSingleToken = userDoc.get("fcmToken");
-  const currentTokenArray = userDoc.get("fcmTokens");
+async function createInAppNotification({
+  userId,
+  title,
+  message,
+  type,
+  relatedThreadId = null,
+}) {
+  if (!userId) return;
 
-  const cleanedArray = Array.isArray(currentTokenArray)
-    ? currentTokenArray.filter(
-        (token) =>
-          typeof token === "string" &&
-          token.trim() !== "" &&
-          !invalidTokens.includes(token.trim())
-      )
-    : [];
-
-  const updates = {
-    fcmTokens: cleanedArray,
-  };
-
-  if (
-    typeof currentSingleToken === "string" &&
-    currentSingleToken.trim() !== "" &&
-    invalidTokens.includes(currentSingleToken.trim())
-  ) {
-    updates.fcmToken = cleanedArray.length > 0 ? cleanedArray[0] : admin.firestore.FieldValue.delete();
-  }
-
-  await userRef.set(updates, { merge: true });
+  await db.collection("notifications").add({
+    userId,
+    title,
+    message,
+    type,
+    createdAt: Date.now(),
+    isRead: false,
+    relatedThreadId,
+  });
 }
 
 async function sendNotificationToUser(userId, title, body, data = {}) {
   if (!userId) return;
 
-  const userDoc = await db.collection("users").doc(userId).get();
+  const userRef = db.collection("users").doc(userId);
+  const userDoc = await userRef.get();
+
   if (!userDoc.exists) {
     logger.warn(`User ${userId} not found`);
     return;
   }
 
-  const tokens = getValidTokens(userDoc);
+  const tokens = getAllValidTokens(userDoc);
 
-  if (tokens.length === 0) {
+  if (!tokens.length) {
     logger.warn(`User ${userId} has no valid FCM tokens`);
     return;
   }
@@ -84,54 +85,55 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
   try {
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
+      data: Object.fromEntries(
+        Object.entries({
+          title,
+          body,
+          ...data,
+        }).map(([key, value]) => [key, String(value)])
+      ),
       notification: {
         title,
         body,
       },
-      data: Object.fromEntries(
-        Object.entries(data).map(([key, value]) => [key, String(value)])
-      ),
       android: {
         priority: "high",
         notification: {
           channelId: "entreprisekilde_urgent_v2",
-          sound: "default",
         },
       },
     });
 
-    logger.info(`Notification send result for ${userId}`, {
+    logger.info(`Notification send attempted to ${userId}`, {
+      tokensCount: tokens.length,
       successCount: response.successCount,
       failureCount: response.failureCount,
-      tokensCount: tokens.length,
     });
 
-    const invalidTokens = [];
-
+    const validTokens = [];
     response.responses.forEach((result, index) => {
-      if (!result.success) {
-        const errorCode = result.error?.code || "";
-        logger.error(`Failed token for user ${userId}`, {
-          token: tokens[index],
-          code: errorCode,
-          message: result.error?.message || "Unknown error",
-        });
-
-        if (
-          errorCode === "messaging/invalid-registration-token" ||
-          errorCode === "messaging/registration-token-not-registered"
-        ) {
-          invalidTokens.push(tokens[index]);
-        }
+      const token = tokens[index];
+      if (result.success) {
+        validTokens.push(token);
+        return;
       }
+
+      const code = result.error?.code || "";
+      logger.error(`Failed for token`, {
+        userId,
+        token,
+        code,
+        message: result.error?.message || "Unknown error",
+      });
     });
 
-    if (invalidTokens.length > 0) {
-      await removeInvalidTokens(userId, invalidTokens);
-      logger.warn(`Removed invalid tokens for user ${userId}`, { invalidTokens });
-    }
+    await cleanupUserTokens(userId, validTokens);
   } catch (error) {
-    logger.error(`Failed to send notification to ${userId}`, error);
+    logger.error(`Failed to send notification to ${userId}`, {
+      userId,
+      code: error?.code || "",
+      message: error?.message || "Unknown error",
+    });
   }
 }
 
@@ -158,19 +160,30 @@ exports.sendMessageNotification = onDocumentCreated(
         : {};
 
     const senderId = typeof message.senderId === "string" ? message.senderId.trim() : "";
+    const explicitRecipientId =
+      typeof message.recipientUserId === "string" ? message.recipientUserId.trim() : "";
     const text = typeof message.text === "string" ? message.text.trim() : "";
+    const messageType =
+      typeof message.messageType === "string" ? message.messageType.trim() : "text";
 
     if (!senderId) {
       logger.warn(`Message ${event.params.messageId} in thread ${threadId} has no senderId`);
       return;
     }
 
-    const recipientId = participantIds.find(
-      (id) => typeof id === "string" && id.trim() !== "" && id.trim() !== senderId
-    );
+    let recipientId = explicitRecipientId;
+    if (!recipientId) {
+      const otherParticipants = participantIds.filter(
+        (id) => typeof id === "string" && id.trim() !== "" && id.trim() !== senderId
+      );
+
+      if (otherParticipants.length === 1) {
+        recipientId = otherParticipants[0].trim();
+      }
+    }
 
     if (!recipientId) {
-      logger.warn(`No recipient found for thread ${threadId}`);
+      logger.warn(`Could not determine recipient for thread ${threadId}`);
       return;
     }
 
@@ -179,10 +192,22 @@ exports.sendMessageNotification = onDocumentCreated(
         ? participantNames[senderId].trim()
         : "New message";
 
+    const body = messageType === "image"
+      ? "📷 Sent you an image"
+      : (text || "You received a new message");
+
+    await createInAppNotification({
+      userId: recipientId,
+      title: "New message",
+      message: `${senderName}: ${body}`,
+      type: "MESSAGE",
+      relatedThreadId: Number(threadId),
+    });
+
     await sendNotificationToUser(
       recipientId,
       senderName,
-      text || "You received a new message",
+      body,
       {
         type: "chat",
         threadId,
@@ -220,10 +245,20 @@ exports.sendTaskAssignedNotificationOnCreate = onDocumentCreated(
         ? task.taskDetails.trim()
         : "You have been assigned a new task";
 
+    const message = `${customer}: ${taskDetails}`;
+
+    await createInAppNotification({
+      userId: assignedUserId,
+      title: "Task assigned",
+      message,
+      type: "TASK_ASSIGNED",
+      relatedThreadId: null,
+    });
+
     await sendNotificationToUser(
       assignedUserId,
       "New task assigned",
-      `${customer}: ${taskDetails}`,
+      message,
       {
         type: "task",
         taskId,
@@ -260,10 +295,20 @@ exports.sendTaskAssignedNotificationOnUpdate = onDocumentUpdated(
         ? after.taskDetails.trim()
         : "You have been assigned a task";
 
+    const message = `${customer}: ${taskDetails}`;
+
+    await createInAppNotification({
+      userId: afterAssigned,
+      title: "Task assigned",
+      message,
+      type: "TASK_ASSIGNED",
+      relatedThreadId: null,
+    });
+
     await sendNotificationToUser(
       afterAssigned,
       "Task assigned to you",
-      `${customer}: ${taskDetails}`,
+      message,
       {
         type: "task",
         taskId,

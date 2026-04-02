@@ -2,6 +2,7 @@ package com.entreprisekilde.app.notifications
 
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessaging
@@ -31,7 +32,7 @@ object FcmTokenManager {
                 return
             }
 
-            Log.d(TAG, "Syncing token for userId=$currentUserId")
+            Log.d(TAG, "Syncing token for userId=$currentUserId token=$token")
 
             removeTokenFromOtherUsers(
                 token = token,
@@ -40,19 +41,11 @@ object FcmTokenManager {
 
             val userRef = firestore.collection("users").document(currentUserId)
 
-            val snapshot = userRef.get().await()
-
-            val existingTokens = (snapshot.get("fcmTokens") as? List<*>)?.filterIsInstance<String>()
-                ?.map { it.trim() }
-                ?.filter { it.isNotBlank() }
-                ?: emptyList()
-
-            val updatedTokens = (existingTokens + token).distinct()
-
             userRef.set(
                 mapOf(
                     "fcmToken" to token,
-                    "fcmTokens" to updatedTokens
+                    "fcmTokens" to FieldValue.arrayUnion(token),
+                    "lastTokenUpdatedAt" to System.currentTimeMillis()
                 ),
                 SetOptions.merge()
             ).await()
@@ -71,22 +64,24 @@ object FcmTokenManager {
             if (token.isBlank()) return
 
             val userRef = firestore.collection("users").document(userId)
-            val snapshot = userRef.get().await()
-            if (!snapshot.exists()) return
 
-            val existingTokens = (snapshot.get("fcmTokens") as? List<*>)?.filterIsInstance<String>()
+            userRef.set(
+                mapOf(
+                    "fcmTokens" to FieldValue.arrayRemove(token),
+                    "lastTokenUpdatedAt" to System.currentTimeMillis()
+                ),
+                SetOptions.merge()
+            ).await()
+
+            val snapshot = userRef.get().await()
+            val remainingTokens = (snapshot.get("fcmTokens") as? List<*>)?.filterIsInstance<String>()
                 ?.map { it.trim() }
                 ?.filter { it.isNotBlank() }
                 ?: emptyList()
 
-            val updatedTokens = existingTokens.filter { it != token }
-
-            val newSingleToken = updatedTokens.firstOrNull() ?: ""
-
             userRef.set(
                 mapOf(
-                    "fcmToken" to newSingleToken,
-                    "fcmTokens" to updatedTokens
+                    "fcmToken" to (remainingTokens.firstOrNull() ?: "")
                 ),
                 SetOptions.merge()
             ).await()
@@ -116,18 +111,15 @@ object FcmTokenManager {
             if (!containsToken) continue
 
             val cleanedTokens = tokenList.filter { it != token }
-            val cleanedSingleToken = if (singleToken == token) {
-                cleanedTokens.firstOrNull() ?: ""
-            } else {
-                singleToken
-            }
+            val cleanedSingleToken = cleanedTokens.firstOrNull() ?: ""
 
             firestore.collection("users")
                 .document(doc.id)
                 .set(
                     mapOf(
                         "fcmToken" to cleanedSingleToken,
-                        "fcmTokens" to cleanedTokens
+                        "fcmTokens" to cleanedTokens,
+                        "lastTokenUpdatedAt" to System.currentTimeMillis()
                     ),
                     SetOptions.merge()
                 )

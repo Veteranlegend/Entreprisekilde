@@ -56,10 +56,9 @@ fun NotificationScreen(
     onProfileClick: () -> Unit = {},
     onScreenClosed: () -> Unit = {}
 ) {
-    LaunchedEffect(Unit) {
+    LaunchedEffect(notifications.size) {
         onScreenOpened()
     }
-
     DisposableEffect(Unit) {
         onDispose {
             onScreenClosed()

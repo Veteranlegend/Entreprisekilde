@@ -21,7 +21,6 @@ class NotificationViewModel(
 
     private var activeUserId: String? = null
     private var isNotificationsScreenOpen = false
-    private var lastSeenTimestamp = 0L
 
     fun startListeningForUser(userId: String) {
         if (activeUserId == userId) return
@@ -32,22 +31,20 @@ class NotificationViewModel(
         repository.observeNotifications(
             userId = userId,
             onChanged = { updatedNotifications ->
-                val sortedNotifications = updatedNotifications
-                    .sortedByDescending { it.createdAt }
+                val sortedNotifications = updatedNotifications.sortedByDescending { it.createdAt }
 
                 notifications.clear()
-                notifications.addAll(sortedNotifications)
+                notifications.addAll(
+                    if (isNotificationsScreenOpen) {
+                        sortedNotifications.map { it.copy(isRead = true) }
+                    } else {
+                        sortedNotifications
+                    }
+                )
 
-                unreadCount = if (isNotificationsScreenOpen) {
-                    0
-                } else {
-                    sortedNotifications.count { it.createdAt > lastSeenTimestamp }
-                        .coerceAtMost(9)
-                }
+                recalculateUnreadCount()
             },
-            onError = {
-                // optional later
-            }
+            onError = {}
         )
     }
 
@@ -63,68 +60,31 @@ class NotificationViewModel(
         isNotificationsScreenOpen = isOpen
 
         if (isOpen) {
-            lastSeenTimestamp = System.currentTimeMillis()
-            unreadCount = 0
-
-            val userId = activeUserId ?: return
-            viewModelScope.launch {
-                runCatching {
-                    repository.markAllAsRead(userId)
-                }
-            }
+            markAllAsRead()
         } else {
-            unreadCount = notifications.count { it.createdAt > lastSeenTimestamp }
-                .coerceAtMost(9)
+            recalculateUnreadCount()
         }
     }
 
     fun onNotificationsOpened() {
-        setNotificationsScreenOpen(true)
-    }
+        val userId = activeUserId ?: return
 
-    fun addMessageNotification(
-        senderName: String,
-        recipientUserId: String,
-        threadId: Int,
-        onDone: () -> Unit = {}
-    ) {
-        if (recipientUserId.isBlank()) {
-            onDone()
-            return
+        isNotificationsScreenOpen = true
+
+        // 🔥 FORCE local UI immediately
+        if (notifications.isNotEmpty()) {
+            val updated = notifications.map { it.copy(isRead = true) }
+            notifications.clear()
+            notifications.addAll(updated)
         }
 
+        unreadCount = 0
+
+        // 🔥 FORCE backend update EVERY time
         viewModelScope.launch {
             runCatching {
-                repository.addMessageNotification(
-                    senderName = senderName,
-                    recipientUserId = recipientUserId,
-                    threadId = threadId
-                )
+                repository.markAllAsRead(userId)
             }
-            onDone()
-        }
-    }
-
-    fun addTaskAssignedNotification(
-        taskName: String,
-        assignedUserId: String,
-        assignedToName: String,
-        onDone: () -> Unit = {}
-    ) {
-        if (assignedUserId.isBlank()) {
-            onDone()
-            return
-        }
-
-        viewModelScope.launch {
-            runCatching {
-                repository.addTaskAssignedNotification(
-                    taskName = taskName,
-                    assignedUserId = assignedUserId,
-                    assignedToName = assignedToName
-                )
-            }
-            onDone()
         }
     }
 
@@ -132,6 +92,12 @@ class NotificationViewModel(
         notificationId: String,
         onDone: () -> Unit = {}
     ) {
+        val index = notifications.indexOfFirst { it.id == notificationId }
+        if (index != -1) {
+            notifications[index] = notifications[index].copy(isRead = true)
+        }
+        recalculateUnreadCount()
+
         viewModelScope.launch {
             runCatching {
                 repository.markAsRead(notificationId)
@@ -141,7 +107,12 @@ class NotificationViewModel(
     }
 
     fun markAllAsRead(onDone: () -> Unit = {}) {
-        lastSeenTimestamp = System.currentTimeMillis()
+        if (notifications.isNotEmpty()) {
+            val updated = notifications.map { it.copy(isRead = true) }
+            notifications.clear()
+            notifications.addAll(updated)
+        }
+
         unreadCount = 0
 
         val userId = activeUserId ?: return
@@ -159,19 +130,21 @@ class NotificationViewModel(
         onDone: () -> Unit = {}
     ) {
         notifications.removeAll { it.id == notificationId }
-
-        unreadCount = if (isNotificationsScreenOpen) {
-            0
-        } else {
-            notifications.count { it.createdAt > lastSeenTimestamp }
-                .coerceAtMost(9)
-        }
+        recalculateUnreadCount()
 
         viewModelScope.launch {
             runCatching {
                 repository.deleteNotification(notificationId)
             }
             onDone()
+        }
+    }
+
+    private fun recalculateUnreadCount() {
+        unreadCount = if (isNotificationsScreenOpen) {
+            0
+        } else {
+            notifications.count { !it.isRead }.coerceAtMost(9)
         }
     }
 

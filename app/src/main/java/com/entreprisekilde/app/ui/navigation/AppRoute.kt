@@ -1,8 +1,10 @@
 package com.entreprisekilde.app.ui.navigation
 
+import android.app.Application
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -11,17 +13,18 @@ import com.entreprisekilde.app.data.repository.notifications.FirebaseNotificatio
 import com.entreprisekilde.app.data.repository.tasks.FirebaseTasksRepository
 import com.entreprisekilde.app.data.repository.timesheet.FirebaseTimesheetRepository
 import com.entreprisekilde.app.data.repository.users.FirebaseUsersRepository
-import com.entreprisekilde.app.viewmodel.MessagesViewModel
-import com.entreprisekilde.app.viewmodel.TasksViewModel
-import com.entreprisekilde.app.viewmodel.TimesheetViewModel
-import com.entreprisekilde.app.viewmodel.UsersViewModel
 import com.entreprisekilde.app.ui.auth.login.LoginScreen
 import com.entreprisekilde.app.ui.navigation.admin.AdminAppFlow
 import com.entreprisekilde.app.ui.navigation.employee.EmployeeAppFlow
+import com.entreprisekilde.app.viewmodel.MessagesViewModel
 import com.entreprisekilde.app.viewmodel.NotificationViewModel
+import com.entreprisekilde.app.viewmodel.TasksViewModel
+import com.entreprisekilde.app.viewmodel.TimesheetViewModel
+import com.entreprisekilde.app.viewmodel.UsersViewModel
 
 @Composable
 fun EntreprisekildeApp() {
+    val application = LocalContext.current.applicationContext as Application
 
     val userRepository = FirebaseUsersRepository()
     val tasksRepository = FirebaseTasksRepository()
@@ -32,7 +35,7 @@ fun EntreprisekildeApp() {
     val usersViewModel: UsersViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return UsersViewModel(userRepository) as T
+                return UsersViewModel(application, userRepository) as T
             }
         }
     )

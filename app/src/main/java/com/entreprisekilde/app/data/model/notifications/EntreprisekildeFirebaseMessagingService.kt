@@ -29,6 +29,8 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
     companion object {
         const val CHANNEL_ID = "entreprisekilde_urgent_v2"
         const val CHANNEL_NAME = "Entreprisekilde Urgent"
+        private const val LOGIN_PREFS = "login_prefs"
+        private const val KEY_LOGGED_IN_USER_ID = "logged_in_user_id"
     }
 
     override fun onNewToken(token: String) {
@@ -43,34 +45,28 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
-        Log.d("FCM", "Message received from: ${message.from}")
-        Log.d("FCM", "Notification title: ${message.notification?.title}")
-        Log.d("FCM", "Notification body: ${message.notification?.body}")
+        Log.d("FCM", "From: ${message.from}")
         Log.d("FCM", "Data payload: ${message.data}")
+        Log.d("FCM", "Notification payload title: ${message.notification?.title}")
+        Log.d("FCM", "Notification payload body: ${message.notification?.body}")
 
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-
-        val senderUserId = message.data["senderUserId"]
-            ?: message.data["senderId"]
-            ?: ""
-
-        val recipientUserId = message.data["recipientUserId"]
-            ?: message.data["targetUserId"]
-            ?: message.data["userId"]
-            ?: ""
+        val currentUserId = resolveCurrentUserId()
 
         if (currentUserId.isBlank()) {
-            Log.d("FCM", "No logged in user. Ignoring push notification.")
+            Log.d("FCM", "No logged-in app user -> ignore local display")
             return
         }
 
-        if (senderUserId.isNotBlank() && senderUserId == currentUserId) {
-            Log.d("FCM", "Ignoring self-sent push notification.")
+        val senderUserId = message.data["senderUserId"] ?: ""
+        val recipientUserId = message.data["recipientUserId"] ?: ""
+
+        if (senderUserId == currentUserId) {
+            Log.d("FCM", "Ignoring self notification")
             return
         }
 
         if (recipientUserId.isNotBlank() && recipientUserId != currentUserId) {
-            Log.d("FCM", "Push notification is not for current user. Ignoring.")
+            Log.d("FCM", "Not for this user -> ignore")
             return
         }
 
@@ -83,6 +79,16 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
             ?: "You have a new notification"
 
         showNotification(title, body)
+    }
+
+    private fun resolveCurrentUserId(): String {
+        val authUserId = FirebaseAuth.getInstance().currentUser?.uid
+        if (!authUserId.isNullOrBlank()) {
+            return authUserId
+        }
+
+        val prefs = getSharedPreferences(LOGIN_PREFS, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_LOGGED_IN_USER_ID, "") ?: ""
     }
 
     private fun showNotification(title: String, body: String) {
@@ -121,7 +127,7 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
             ) == PackageManager.PERMISSION_GRANTED
 
             if (!hasPermission) {
-                Log.w("FCM", "Notification permission not granted. Notification not shown.")
+                Log.w("FCM", "POST_NOTIFICATIONS permission not granted")
                 return
             }
         }
@@ -131,35 +137,31 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
             notification
         )
 
-        Log.d("FCM", "Notification displayed successfully")
+        Log.d("FCM", "Notification shown")
     }
 
     private fun createUrgentNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Urgent message and task notifications"
-                enableVibration(true)
-                setShowBadge(true)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setSound(
-                    soundUri,
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-            }
-
-            val notificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Urgent notifications"
+            enableVibration(true)
+            setShowBadge(true)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setSound(
+                soundUri,
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
         }
+
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
     }
 }

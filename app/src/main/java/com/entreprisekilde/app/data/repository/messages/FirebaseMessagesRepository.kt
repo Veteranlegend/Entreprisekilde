@@ -203,6 +203,14 @@ class FirebaseMessagesRepository : MessagesRepository {
         val participantIds = (threadData["participantIds"] as? List<*>)?.filterIsInstance<String>()
             ?: emptyList()
 
+        val participantNamesAny = threadData["participantNames"] as? Map<*, *> ?: emptyMap<Any, Any>()
+        val participantNames = participantNamesAny.entries.associate {
+            it.key.toString() to it.value.toString()
+        }
+
+        val recipientId = participantIds.firstOrNull { it != senderId }.orEmpty()
+        val senderName = participantNames[senderId].orEmpty()
+
         val unreadMapAny = threadData["unreadCountByUser"] as? Map<*, *> ?: emptyMap<Any, Any>()
         val unreadMap = unreadMapAny.entries.associate {
             it.key.toString() to ((it.value as? Number)?.toInt() ?: 0)
@@ -220,6 +228,8 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         val messageData = hashMapOf(
             "senderId" to senderId,
+            "senderName" to senderName,
+            "recipientUserId" to recipientId,
             "text" to trimmedText,
             "imageUrl" to "",
             "messageType" to MESSAGE_TYPE_TEXT,
@@ -254,6 +264,14 @@ class FirebaseMessagesRepository : MessagesRepository {
         val participantIds = (threadData["participantIds"] as? List<*>)?.filterIsInstance<String>()
             ?: emptyList()
 
+        val participantNamesAny = threadData["participantNames"] as? Map<*, *> ?: emptyMap<Any, Any>()
+        val participantNames = participantNamesAny.entries.associate {
+            it.key.toString() to it.value.toString()
+        }
+
+        val recipientId = participantIds.firstOrNull { it != senderId }.orEmpty()
+        val senderName = participantNames[senderId].orEmpty()
+
         val unreadMapAny = threadData["unreadCountByUser"] as? Map<*, *> ?: emptyMap<Any, Any>()
         val unreadMap = unreadMapAny.entries.associate {
             it.key.toString() to ((it.value as? Number)?.toInt() ?: 0)
@@ -279,6 +297,8 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         val messageData = hashMapOf(
             "senderId" to senderId,
+            "senderName" to senderName,
+            "recipientUserId" to recipientId,
             "text" to "",
             "imageUrl" to downloadUrl,
             "messageType" to MESSAGE_TYPE_IMAGE,
