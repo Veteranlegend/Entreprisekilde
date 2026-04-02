@@ -5,7 +5,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
@@ -17,7 +16,6 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.entreprisekilde.app.MainActivity
 import com.entreprisekilde.app.R
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -29,8 +27,6 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
     companion object {
         const val CHANNEL_ID = "entreprisekilde_urgent_v2"
         const val CHANNEL_NAME = "Entreprisekilde Urgent"
-        private const val LOGIN_PREFS = "login_prefs"
-        private const val KEY_LOGGED_IN_USER_ID = "logged_in_user_id"
     }
 
     override fun onNewToken(token: String) {
@@ -50,26 +46,6 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
         Log.d("FCM", "Notification payload title: ${message.notification?.title}")
         Log.d("FCM", "Notification payload body: ${message.notification?.body}")
 
-        val currentUserId = resolveCurrentUserId()
-
-        if (currentUserId.isBlank()) {
-            Log.d("FCM", "No logged-in app user -> ignore local display")
-            return
-        }
-
-        val senderUserId = message.data["senderUserId"] ?: ""
-        val recipientUserId = message.data["recipientUserId"] ?: ""
-
-        if (senderUserId == currentUserId) {
-            Log.d("FCM", "Ignoring self notification")
-            return
-        }
-
-        if (recipientUserId.isNotBlank() && recipientUserId != currentUserId) {
-            Log.d("FCM", "Not for this user -> ignore")
-            return
-        }
-
         val title = message.data["title"]
             ?: message.notification?.title
             ?: "Entreprisekilde"
@@ -78,17 +54,12 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
             ?: message.notification?.body
             ?: "You have a new notification"
 
+        val senderUserId = message.data["senderUserId"] ?: ""
+        val recipientUserId = message.data["recipientUserId"] ?: ""
+
+        Log.d("FCM", "senderUserId=$senderUserId recipientUserId=$recipientUserId")
+
         showNotification(title, body)
-    }
-
-    private fun resolveCurrentUserId(): String {
-        val authUserId = FirebaseAuth.getInstance().currentUser?.uid
-        if (!authUserId.isNullOrBlank()) {
-            return authUserId
-        }
-
-        val prefs = getSharedPreferences(LOGIN_PREFS, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_LOGGED_IN_USER_ID, "") ?: ""
     }
 
     private fun showNotification(title: String, body: String) {
@@ -161,7 +132,7 @@ class EntreprisekildeFirebaseMessagingService : FirebaseMessagingService() {
             )
         }
 
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
     }
 }

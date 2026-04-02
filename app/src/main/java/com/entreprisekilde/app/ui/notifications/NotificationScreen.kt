@@ -59,6 +59,7 @@ fun NotificationScreen(
     LaunchedEffect(notifications.size) {
         onScreenOpened()
     }
+
     DisposableEffect(Unit) {
         onDispose {
             onScreenClosed()
@@ -265,7 +266,7 @@ private fun NotificationCard(
             Spacer(modifier = Modifier.size(4.dp))
 
             Text(
-                text = notification.createdAt.toString(),
+                text = formatTimeAgo(notification.createdAt),
                 fontSize = 12.sp,
                 color = Color(0xFF8A8A8A)
             )
@@ -278,5 +279,23 @@ private fun NotificationCard(
             fontWeight = FontWeight.Medium,
             modifier = Modifier.clickable { onDelete() }
         )
+    }
+}
+
+private fun formatTimeAgo(createdAt: Long): String {
+    val now = System.currentTimeMillis()
+    val diffMillis = (now - createdAt).coerceAtLeast(0L)
+
+    val minute = 60_000L
+    val hour = 60 * minute
+    val day = 24 * hour
+    val week = 7 * day
+
+    return when {
+        diffMillis < minute -> "Just now"
+        diffMillis < hour -> "${diffMillis / minute} min ago"
+        diffMillis < day -> "${diffMillis / hour} h ago"
+        diffMillis < week -> "${diffMillis / day} d ago"
+        else -> "${diffMillis / week} w ago"
     }
 }

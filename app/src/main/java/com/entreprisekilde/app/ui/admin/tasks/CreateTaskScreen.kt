@@ -1,13 +1,19 @@
 package com.entreprisekilde.app.ui.admin.tasks
-
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import android.app.DatePickerDialog
+import android.net.Uri
 import android.widget.DatePicker
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -22,24 +28,29 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.AddTask
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.entreprisekilde.app.data.model.task.TaskData
@@ -59,11 +71,12 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreateTaskScreen(
     unreadNotificationCount: Int = 0,
     onBack: () -> Unit = {},
-    onCreateTask: (TaskData) -> Unit = {},
+    onCreateTask: (TaskData, List<Uri>) -> Unit = { _, _ -> },
     assignedUserOptions: List<User> = emptyList(),
     onHomeClick: () -> Unit = {},
     onMessagesClick: () -> Unit = {},
@@ -82,6 +95,8 @@ fun CreateTaskScreen(
     var assignToExpanded by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
+    val selectedImageUris = remember { mutableStateListOf<Uri>() }
+
     var customerError by remember { mutableStateOf<String?>(null) }
     var phoneNumberError by remember { mutableStateOf<String?>(null) }
     var addressError by remember { mutableStateOf<String?>(null) }
@@ -95,6 +110,15 @@ fun CreateTaskScreen(
 
     val calendar = remember { Calendar.getInstance() }
     val displayFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            selectedImageUris.clear()
+            selectedImageUris.addAll(uris)
+        }
+    }
 
     val datePickerDialog = remember {
         DatePickerDialog(
@@ -117,12 +141,43 @@ fun CreateTaskScreen(
     }
 
     fun validateFields(): Boolean {
-        customerError = if (customer.trim().isBlank()) "Customer is required" else null
-        phoneNumberError = if (phoneNumber.trim().isBlank()) "Phone number is required" else null
-        addressError = if (address.trim().isBlank()) "Address is required" else null
-        dateError = if (date.trim().isBlank()) "Date is required" else null
-        assignToError = if (assignTo.trim().isBlank() || assignedUserId.trim().isBlank()) "Please select an employee" else null
-        taskDetailsError = if (taskDetails.trim().isBlank()) "Task details are required" else null
+        val digitsOnlyPhoneNumber = phoneNumber.filter { it.isDigit() }
+
+        customerError = if (customer.trim().isBlank()) {
+            "Customer is required"
+        } else {
+            null
+        }
+
+        phoneNumberError = when {
+            digitsOnlyPhoneNumber.isBlank() -> "Phone number is required"
+            digitsOnlyPhoneNumber.length < 8 -> "Phone number must be at least 8 digits"
+            else -> null
+        }
+
+        addressError = if (address.trim().isBlank()) {
+            "Address is required"
+        } else {
+            null
+        }
+
+        dateError = if (date.trim().isBlank()) {
+            "Date is required"
+        } else {
+            null
+        }
+
+        assignToError = if (assignTo.trim().isBlank() || assignedUserId.trim().isBlank()) {
+            "Please select an employee"
+        } else {
+            null
+        }
+
+        taskDetailsError = if (taskDetails.trim().isBlank()) {
+            "Task details are required"
+        } else {
+            null
+        }
 
         return customerError == null &&
                 phoneNumberError == null &&
@@ -225,10 +280,13 @@ fun CreateTaskScreen(
                 label = "Phone Number",
                 value = phoneNumber,
                 onValueChange = {
-                    phoneNumber = it
-                    if (it.trim().isNotBlank()) phoneNumberError = null
+                    phoneNumber = it.filter { character -> character.isDigit() }
+                    if (phoneNumber.length >= 8) {
+                        phoneNumberError = null
+                    }
                 },
-                errorMessage = phoneNumberError
+                errorMessage = phoneNumberError,
+                keyboardType = KeyboardType.Number
             )
 
             SmallField(
@@ -276,6 +334,18 @@ fun CreateTaskScreen(
                 errorMessage = taskDetailsError
             )
 
+            TaskImagesField(
+                imageCount = selectedImageUris.size,
+                onPickImages = {
+                    imagePickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onClearImages = {
+                    selectedImageUris.clear()
+                }
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
@@ -292,8 +362,10 @@ fun CreateTaskScreen(
                             assignTo = assignTo.trim(),
                             assignedUserId = assignedUserId.trim(),
                             taskDetails = taskDetails.trim(),
-                            status = TaskStatus.PENDING
-                        )
+                            status = TaskStatus.PENDING,
+                            imageUrls = emptyList()
+                        ),
+                        selectedImageUris.toList()
                     )
 
                     customer = ""
@@ -304,6 +376,7 @@ fun CreateTaskScreen(
                     assignedUserId = ""
                     taskDetails = ""
                     assignToExpanded = false
+                    selectedImageUris.clear()
 
                     customerError = null
                     phoneNumberError = null
@@ -349,7 +422,8 @@ private fun SmallField(
     onValueChange: (String) -> Unit,
     singleLine: Boolean = true,
     minLines: Int = 1,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -371,6 +445,7 @@ private fun SmallField(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             isError = errorMessage != null,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White,
@@ -537,6 +612,77 @@ private fun AssignToSelectorField(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TaskImagesField(
+    imageCount: Int,
+    onPickImages: () -> Unit,
+    onClearImages: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = "Task Images",
+            color = Color(0xFF444444),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Button(
+            onClick = onPickImages,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.White,
+                contentColor = Color.Black
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AddPhotoAlternate,
+                contentDescription = null
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = if (imageCount == 0) {
+                    "Add pictures"
+                } else {
+                    "$imageCount picture(s) selected"
+                }
+            )
+        }
+
+        if (imageCount > 0) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "$imageCount selected",
+                    color = Color(0xFF666666),
+                    fontSize = 13.sp
+                )
+
+                IconButton(
+                    onClick = onClearImages,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Clear images",
+                        tint = Color(0xFFC62828)
+                    )
+                }
+            }
         }
     }
 }

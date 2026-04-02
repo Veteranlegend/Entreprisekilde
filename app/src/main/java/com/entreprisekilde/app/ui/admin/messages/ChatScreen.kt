@@ -1,8 +1,11 @@
 package com.entreprisekilde.app.ui.admin.messages
 
+import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,12 +33,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.SupervisorAccount
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -47,13 +54,17 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
 import com.entreprisekilde.app.data.model.messages.ChatMessage
 import com.entreprisekilde.app.data.model.messages.MessageThread
+import java.io.File
 
 @Composable
 fun ChatScreen(
@@ -68,12 +79,27 @@ fun ChatScreen(
     onStopTyping: () -> Unit = {}
 ) {
     var messageText by remember { mutableStateOf("") }
+    var showImageOptions by remember { mutableStateOf(false) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val context = LocalContext.current
     val listState = rememberLazyListState()
 
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
+        showImageOptions = false
         if (uri != null) {
+            onSendImage(uri)
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uri = pendingCameraUri
+        showImageOptions = false
+        if (success && uri != null) {
             onSendImage(uri)
         }
     }
@@ -96,6 +122,85 @@ fun ChatScreen(
     val lastMyMessageId = messages
         .lastOrNull { it.senderId == loggedInUserId }
         ?.id
+
+    if (showImageOptions) {
+        AlertDialog(
+            onDismissRequest = { showImageOptions = false },
+            title = {
+                Text(
+                    text = "Send image",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF5F7FB), RoundedCornerShape(14.dp))
+                            .clickable {
+                                galleryLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.AddPhotoAlternate,
+                            contentDescription = null,
+                            tint = Color(0xFF5F6B7A)
+                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Text(
+                            text = "Choose from gallery",
+                            color = Color.Black
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF5F7FB), RoundedCornerShape(14.dp))
+                            .clickable {
+                                val uri = createImageUri(context)
+                                pendingCameraUri = uri
+                                cameraLauncher.launch(uri)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CameraAlt,
+                            contentDescription = null,
+                            tint = Color(0xFF5F6B7A)
+                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Text(
+                            text = "Take photo",
+                            color = Color.Black
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = { showImageOptions = false }
+                ) {
+                    Text("Close")
+                }
+            },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = Color.White
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -195,7 +300,7 @@ fun ChatScreen(
                     .size(48.dp)
                     .background(Color(0xFFE9ECF2), CircleShape)
                     .clickable {
-                        galleryLauncher.launch("image/*")
+                        showImageOptions = true
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -277,7 +382,10 @@ private fun MessageBubble(
                 Image(
                     painter = rememberAsyncImagePainter(message.imageUrl),
                     contentDescription = null,
-                    modifier = Modifier.size(180.dp)
+                    modifier = Modifier
+                        .size(180.dp)
+                        .clip(RoundedCornerShape(14.dp)),
+                    contentScale = ContentScale.Crop
                 )
             } else {
                 Text(
@@ -311,4 +419,22 @@ private fun MessageBubble(
             }
         }
     }
+}
+
+private fun createImageUri(context: Context): Uri {
+    val imagesDir = File(context.cacheDir, "chat_camera_images").apply {
+        if (!exists()) mkdirs()
+    }
+
+    val imageFile = File.createTempFile(
+        "chat_photo_${System.currentTimeMillis()}",
+        ".jpg",
+        imagesDir
+    )
+
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        imageFile
+    )
 }

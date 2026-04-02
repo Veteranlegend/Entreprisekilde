@@ -362,6 +362,19 @@ fun AdminAppFlow(
                         selectedTaskId.value = normalizedTask.id
                         tasksViewModel.updateTask(normalizedTask)
                     },
+                    onAddImages = { currentTask, imageUris ->
+                        val currentUser = loggedInUser ?: return@TaskDetailsScreen
+
+                        tasksViewModel.addImagesToTask(
+                            task = currentTask,
+                            imageUris = imageUris,
+                            uploadedByUserId = currentUser.id,
+                            uploadedByName = currentUser.fullName
+                        ) { refreshedTask ->
+                            cachedSelectedTask.value = refreshedTask
+                            selectedTaskId.value = refreshedTask.id
+                        }
+                    },
                     assignedUserOptions = taskAssignedUserOptions,
                     unreadNotificationCount = unreadNotificationCount,
                     onHomeClick = goToDashboard,
@@ -378,8 +391,11 @@ fun AdminAppFlow(
             CreateTaskScreen(
                 unreadNotificationCount = unreadNotificationCount,
                 onBack = goToDashboard,
-                onCreateTask = { task ->
-                    tasksViewModel.addTask(task.copy(date = normalizeDateForDisplay(task.date)))
+                onCreateTask = { task, imageUris ->
+                    tasksViewModel.addTask(
+                        newTask = task.copy(date = normalizeDateForDisplay(task.date)),
+                        imageUris = imageUris
+                    )
                 },
                 assignedUserOptions = taskAssignedUsers,
                 onHomeClick = goToDashboard,

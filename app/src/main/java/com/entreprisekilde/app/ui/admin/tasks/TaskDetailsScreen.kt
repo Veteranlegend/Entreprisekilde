@@ -5,15 +5,21 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.widget.DatePicker
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,10 +34,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,27 +52,35 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 import com.entreprisekilde.app.data.model.task.TaskData
+import com.entreprisekilde.app.data.model.task.TaskImageData
+import com.entreprisekilde.app.data.model.task.TaskImageSource
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TaskDetailsScreen(
     task: TaskData,
     onBack: () -> Unit = {},
     onSaveEdit: (TaskData) -> Unit = {},
+    onAddImages: (TaskData, List<Uri>) -> Unit = { _, _ -> },
     assignedUserOptions: List<String> = emptyList(),
     unreadNotificationCount: Int = 0,
     onHomeClick: () -> Unit = {},
@@ -84,6 +100,27 @@ fun TaskDetailsScreen(
     var assignToExpanded by remember { mutableStateOf(false) }
     var showSavedDialog by remember { mutableStateOf(false) }
     var showMapsErrorDialog by remember { mutableStateOf(false) }
+
+    val selectedNewImageUris = remember { mutableStateListOf<Uri>() }
+    var selectedImageUrl by remember { mutableStateOf<String?>(null) }
+
+    val createdImages = remember(task.images) {
+        task.images.filter { it.source == TaskImageSource.CREATED }
+    }
+
+    val uploadedLaterImages = remember(task.images) {
+        task.images.filter { it.source == TaskImageSource.DETAILS }
+    }
+
+    val addImagesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            selectedNewImageUris.clear()
+            selectedNewImageUris.addAll(uris)
+            onAddImages(task, uris)
+        }
+    }
 
     val initialDate = parseToLocalDate(date) ?: LocalDate.now()
 
@@ -147,6 +184,43 @@ fun TaskDetailsScreen(
                     }
                 ) {
                     Text("OK")
+                }
+            }
+        )
+    }
+
+    selectedImageUrl?.let { imageUrl ->
+        AlertDialog(
+            onDismissRequest = { selectedImageUrl = null },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { selectedImageUrl = null }) {
+                    Text("Close")
+                }
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Image(
+                        painter = rememberAsyncImagePainter(imageUrl),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(imageUrl))
+                            context.startActivity(intent)
+                        }
+                    ) {
+                        Text("Download / Open")
+                    }
                 }
             }
         )
@@ -229,11 +303,9 @@ fun TaskDetailsScreen(
             Button(
                 onClick = {
                     val cleanAddress = address.trim()
-
                     if (cleanAddress.isBlank()) return@Button
 
                     val encodedAddress = Uri.encode(cleanAddress)
-
                     val mapsIntent = Intent(
                         Intent.ACTION_VIEW,
                         Uri.parse("geo:0,0?q=$encodedAddress")
@@ -252,7 +324,6 @@ fun TaskDetailsScreen(
                             showMapsErrorDialog = true
                         }
                     }
-
                 },
                 enabled = address.trim().isNotBlank(),
                 modifier = Modifier
@@ -306,6 +377,32 @@ fun TaskDetailsScreen(
                 onValueChange = { taskDetails = it },
                 singleLine = false,
                 minLines = 4
+            )
+
+            TaskImagesSection(
+                title = "Created Images",
+                subtitle = "Images added when the task was created",
+                images = createdImages,
+                emptyText = "No created images",
+                onImageClick = { imageUrl ->
+                    selectedImageUrl = imageUrl
+                }
+            )
+
+            TaskImagesSection(
+                title = "Uploaded Later",
+                subtitle = "Images added from task details",
+                images = uploadedLaterImages,
+                emptyText = "No later uploads yet",
+                showAddButton = true,
+                onAddImagesClick = {
+                    addImagesLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onImageClick = { imageUrl ->
+                    selectedImageUrl = imageUrl
+                }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -507,6 +604,119 @@ private fun AssignToSelectorField(
                         text = { Text(userName) },
                         onClick = { onSelect(userName) }
                     )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TaskImagesSection(
+    title: String,
+    subtitle: String,
+    images: List<TaskImageData>,
+    emptyText: String,
+    showAddButton: Boolean = false,
+    onAddImagesClick: () -> Unit = {},
+    onImageClick: (String) -> Unit = {}
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    color = Color(0xFF444444),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = subtitle,
+                    color = Color(0xFF777777),
+                    fontSize = 12.sp
+                )
+            }
+
+            if (showAddButton) {
+                TextButton(onClick = onAddImagesClick) {
+                    Icon(
+                        imageVector = Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = null
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text("Add")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        if (images.isEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.PhotoLibrary,
+                    contentDescription = null,
+                    tint = Color(0xFF888888)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = emptyText,
+                    color = Color(0xFF777777),
+                    fontSize = 14.sp
+                )
+            }
+        } else {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                images.forEach { image ->
+                    Column(
+                        modifier = Modifier.width(110.dp)
+                    ) {
+                        Image(
+                            painter = rememberAsyncImagePainter(image.imageUrl),
+                            contentDescription = title,
+                            modifier = Modifier
+                                .size(110.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White)
+                                .clickable {
+                                    onImageClick(image.imageUrl)
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+
+                        if (image.source == TaskImageSource.DETAILS && image.uploadedByName.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "By ${image.uploadedByName}",
+                                fontSize = 11.sp,
+                                color = Color(0xFF666666)
+                            )
+                        }
+                    }
                 }
             }
         }

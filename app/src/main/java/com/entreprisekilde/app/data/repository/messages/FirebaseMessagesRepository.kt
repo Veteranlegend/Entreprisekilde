@@ -10,6 +10,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 import java.time.LocalDateTime
@@ -217,11 +218,7 @@ class FirebaseMessagesRepository : MessagesRepository {
         }.toMutableMap()
 
         participantIds.forEach { participantId ->
-            unreadMap[participantId] = if (participantId == senderId) {
-                0
-            } else {
-                (unreadMap[participantId] ?: 0) + 1
-            }
+            unreadMap[participantId] = if (participantId == senderId) 0 else (unreadMap[participantId] ?: 0) + 1
         }
 
         val nowMillis = System.currentTimeMillis()
@@ -278,11 +275,7 @@ class FirebaseMessagesRepository : MessagesRepository {
         }.toMutableMap()
 
         participantIds.forEach { participantId ->
-            unreadMap[participantId] = if (participantId == senderId) {
-                0
-            } else {
-                (unreadMap[participantId] ?: 0) + 1
-            }
+            unreadMap[participantId] = if (participantId == senderId) 0 else (unreadMap[participantId] ?: 0) + 1
         }
 
         val nowMillis = System.currentTimeMillis()
@@ -292,8 +285,16 @@ class FirebaseMessagesRepository : MessagesRepository {
             .child(threadId.toString())
             .child("${UUID.randomUUID()}.jpg")
 
-        imageRef.putFile(imageUri).await()
+        val metadata = StorageMetadata.Builder()
+            .setContentType("image/jpeg")
+            .build()
+
+        imageRef.putFile(imageUri, metadata).await()
         val downloadUrl = imageRef.downloadUrl.await().toString()
+
+        if (downloadUrl.isBlank()) {
+            throw IllegalStateException("Image upload failed: empty download URL.")
+        }
 
         val messageData = hashMapOf(
             "senderId" to senderId,
@@ -433,8 +434,7 @@ class FirebaseMessagesRepository : MessagesRepository {
             messageType = data["messageType"] as? String ?: MESSAGE_TYPE_TEXT,
             time = data["time"] as? String ?: "",
             createdAt = (data["createdAt"] as? Number)?.toLong() ?: 0L,
-            readByUserIds = (data["readByUserIds"] as? List<*>)?.filterIsInstance<String>()
-                ?: emptyList()
+            readByUserIds = (data["readByUserIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
         )
     }
 
@@ -445,8 +445,7 @@ class FirebaseMessagesRepository : MessagesRepository {
     ): MessageThread? {
         if (data == null) return null
 
-        val participantIds = (data["participantIds"] as? List<*>)?.filterIsInstance<String>()
-            ?: emptyList()
+        val participantIds = (data["participantIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
         val participantNamesAny = data["participantNames"] as? Map<*, *> ?: emptyMap<Any, Any>()
         val participantNames = participantNamesAny.entries.associate {
@@ -458,11 +457,8 @@ class FirebaseMessagesRepository : MessagesRepository {
             it.key.toString() to ((it.value as? Number)?.toInt() ?: 0)
         }
 
-        val typingUserIds = (data["typingUserIds"] as? List<*>)?.filterIsInstance<String>()
-            ?: emptyList()
-
-        val deletedForUserIds = (data["deletedForUserIds"] as? List<*>)?.filterIsInstance<String>()
-            ?: emptyList()
+        val typingUserIds = (data["typingUserIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        val deletedForUserIds = (data["deletedForUserIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
         val recipientId = participantIds.firstOrNull { it != currentUserId } ?: ""
         val recipientName = participantNames[recipientId] ?: "Unknown user"

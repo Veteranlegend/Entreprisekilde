@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.ui.admin.tasks
 
+import android.net.Uri
 import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
 import com.entreprisekilde.app.data.repository.tasks.DemoTasksRepository
@@ -35,20 +36,16 @@ class TasksViewModelTest {
 
     @Test
     fun init_loadsTasksIntoState() = runTest {
-        // Arrange
         val repository = DemoTasksRepository()
 
-        // Act
         val viewModel = TasksViewModel(repository)
         advanceUntilIdle()
 
-        // Assert
         assertTrue(viewModel.tasks.isNotEmpty())
     }
 
     @Test
     fun addTask_addsTaskToViewModelState() = runTest {
-        // Arrange
         val repository = DemoTasksRepository()
         val viewModel = TasksViewModel(repository)
         advanceUntilIdle()
@@ -65,19 +62,15 @@ class TasksViewModelTest {
             taskDetails = "Created from ViewModel test"
         )
 
-        // Act
-        viewModel.addTask(newTask)
+        viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
-        // Assert
         assertEquals(initialSize + 1, viewModel.tasks.size)
         assertTrue(viewModel.tasks.any { it.id == "vm-task-1" })
     }
 
-
     @Test
     fun deleteTask_removesTaskFromViewModelState() = runTest {
-        // Arrange
         val repository = DemoTasksRepository()
         val viewModel = TasksViewModel(repository)
         advanceUntilIdle()
@@ -92,23 +85,20 @@ class TasksViewModelTest {
             taskDetails = "Task to delete"
         )
 
-        viewModel.addTask(taskToDelete)
+        viewModel.addTask(taskToDelete, emptyList())
         advanceUntilIdle()
 
         val sizeBeforeDelete = viewModel.tasks.size
 
-        // Act
         viewModel.deleteTask("vm-delete-task")
         advanceUntilIdle()
 
-        // Assert
         assertEquals(sizeBeforeDelete - 1, viewModel.tasks.size)
         assertTrue(viewModel.tasks.none { it.id == "vm-delete-task" })
     }
 
     @Test
     fun updateStatus_changesTaskStatusInViewModelState() = runTest {
-        // Arrange
         val repository = DemoTasksRepository()
         val viewModel = TasksViewModel(repository)
         advanceUntilIdle()
@@ -123,49 +113,57 @@ class TasksViewModelTest {
             taskDetails = "Task for status update"
         )
 
-        viewModel.addTask(taskToUpdate)
+        viewModel.addTask(taskToUpdate, emptyList())
         advanceUntilIdle()
 
-        // Act
-        viewModel.updateStatus("vm-status-task", com.entreprisekilde.app.data.model.task.TaskStatus.COMPLETED)
+        viewModel.updateStatus("vm-status-task", TaskStatus.COMPLETED)
         advanceUntilIdle()
 
-        // Assert
         val updatedTask = viewModel.tasks.first { it.id == "vm-status-task" }
-        assertEquals(com.entreprisekilde.app.data.model.task.TaskStatus.COMPLETED, updatedTask.status)
+        assertEquals(TaskStatus.COMPLETED, updatedTask.status)
     }
+
     @Test
     fun selectTask_andClearSelectedTask_updateSelectedTaskIndex() {
-        // Arrange
         val repository = DemoTasksRepository()
         val viewModel = TasksViewModel(repository)
 
-        // Act
         viewModel.selectTask(2)
-
-        // Assert
         assertEquals(2, viewModel.selectedTaskIndex.value)
 
-        // Act
         viewModel.clearSelectedTask()
-
-        // Assert
         assertEquals(-1, viewModel.selectedTaskIndex.value)
     }
 
     @Test
     fun addTask_whenRepositoryFails_setsErrorMessage() = runTest {
-        // Arrange
         val failingRepository = object : TasksRepository {
-            override suspend fun getTasks() = emptyList<TaskData>()
 
-            override suspend fun addTask(newTask: TaskData) {
+            override suspend fun getTasks(): List<TaskData> {
+                return emptyList()
+            }
+
+            override suspend fun addTask(
+                newTask: TaskData,
+                imageUris: List<Uri>
+            ): TaskData {
                 throw Exception("Test error")
             }
 
             override suspend fun deleteTask(taskId: String) {}
+
             override suspend fun updateTask(updatedTask: TaskData) {}
+
             override suspend fun updateStatus(taskId: String, newStatus: TaskStatus) {}
+
+            override suspend fun addImagesToTask(
+                task: TaskData,
+                imageUris: List<Uri>,
+                uploadedByUserId: String,
+                uploadedByName: String
+            ): TaskData {
+                return task
+            }
         }
 
         val viewModel = TasksViewModel(failingRepository)
@@ -180,11 +178,9 @@ class TasksViewModelTest {
             taskDetails = "Error test"
         )
 
-        // Act
-        viewModel.addTask(newTask)
+        viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
-        // Assert
-        assertTrue(viewModel.errorMessage.value == "Test error")
+        assertEquals("Test error", viewModel.errorMessage.value)
     }
 }

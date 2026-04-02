@@ -51,7 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -357,11 +356,9 @@ private fun SwipeToRevealThreadCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = thread.lastMessage,
+                    text = formatTimeAgo(thread.updatedAt),
                     fontSize = 14.sp,
-                    color = if (thread.unreadCount > 0) Color.Black else Color(0xFF777777),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = Color(0xFF777777)
                 )
             }
 
@@ -383,5 +380,25 @@ private fun SwipeToRevealThreadCard(
                 }
             }
         }
+    }
+}
+
+private fun formatTimeAgo(timestamp: Long): String {
+    if (timestamp <= 0L) return ""
+
+    val now = System.currentTimeMillis()
+    val diffMillis = (now - timestamp).coerceAtLeast(0L)
+
+    val minute = 60_000L
+    val hour = 60 * minute
+    val day = 24 * hour
+    val week = 7 * day
+
+    return when {
+        diffMillis < minute -> "Just now"
+        diffMillis < hour -> "${diffMillis / minute} min ago"
+        diffMillis < day -> "${diffMillis / hour} h ago"
+        diffMillis < week -> "${diffMillis / day} d ago"
+        else -> "${diffMillis / week} w ago"
     }
 }

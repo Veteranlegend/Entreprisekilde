@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.tasks
 
+import android.net.Uri
 import com.entreprisekilde.app.data.model.task.TaskData
 import com.entreprisekilde.app.data.model.task.TaskStatus
 import com.entreprisekilde.app.data.repository.tasks.DemoTasksRepository
@@ -54,7 +55,7 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
-        viewModel.addTask(newTask)
+        viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
         val exists = viewModel.tasks.any {
@@ -78,7 +79,7 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
-        viewModel.addTask(newTask)
+        viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
         val addedTask = viewModel.tasks.firstOrNull {
@@ -111,7 +112,7 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
-        viewModel.addTask(newTask)
+        viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
         val addedTask = viewModel.tasks.firstOrNull {
@@ -146,7 +147,7 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
-        viewModel.addTask(newTask)
+        viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
         val addedTask = viewModel.tasks.firstOrNull {
@@ -187,11 +188,15 @@ class TasksIntegrationTest {
     }
 
     private class FailingTasksRepository : TasksRepository {
+
         override suspend fun getTasks(): List<TaskData> {
             throw Exception("Failed to load tasks for test")
         }
 
-        override suspend fun addTask(newTask: TaskData) {
+        override suspend fun addTask(
+            newTask: TaskData,
+            imageUris: List<Uri>
+        ): TaskData {
             throw Exception("Not needed in this test")
         }
 
@@ -204,6 +209,15 @@ class TasksIntegrationTest {
         }
 
         override suspend fun updateStatus(taskId: String, newStatus: TaskStatus) {
+            throw Exception("Not needed in this test")
+        }
+
+        override suspend fun addImagesToTask(
+            task: TaskData,
+            imageUris: List<Uri>,
+            uploadedByUserId: String,
+            uploadedByName: String
+        ): TaskData {
             throw Exception("Not needed in this test")
         }
     }

@@ -1,5 +1,6 @@
 package com.entreprisekilde.app.viewmodel
 
+import android.net.Uri
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -39,16 +40,50 @@ class TasksViewModel(
         loadTasks()
     }
 
-    fun addTask(newTask: TaskData) {
+    fun addTask(
+        newTask: TaskData,
+        imageUris: List<Uri> = emptyList()
+    ) {
         viewModelScope.launch {
             isLoading.value = true
             errorMessage.value = null
 
             try {
-                tasksRepository.addTask(newTask)
+                tasksRepository.addTask(newTask, imageUris)
                 refreshTasks()
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to add task."
+            } finally {
+                isLoading.value = false
+            }
+        }
+    }
+
+    fun addImagesToTask(
+        task: TaskData,
+        imageUris: List<Uri>,
+        uploadedByUserId: String,
+        uploadedByName: String,
+        onDone: (TaskData) -> Unit = {}
+    ) {
+        if (imageUris.isEmpty()) return
+
+        viewModelScope.launch {
+            isLoading.value = true
+            errorMessage.value = null
+
+            try {
+                val updatedTask = tasksRepository.addImagesToTask(
+                    task = task,
+                    imageUris = imageUris,
+                    uploadedByUserId = uploadedByUserId,
+                    uploadedByName = uploadedByName
+                )
+
+                refreshTasks()
+                onDone(updatedTask)
+            } catch (e: Exception) {
+                errorMessage.value = e.message ?: "Failed to add task images."
             } finally {
                 isLoading.value = false
             }
