@@ -67,18 +67,51 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
+/**
+ * Represents the kind of quick inline task update the admin performed.
+ *
+ * This is mainly used to:
+ * - decide what confirmation message to show
+ * - keep update handling clear and explicit
+ */
 private enum class TaskChangeType {
     DATE,
     ASSIGNEE,
     STATUS
 }
 
+/**
+ * Small UI model used for the temporary confirmation banner shown at the bottom.
+ *
+ * We keep:
+ * - the affected task ID
+ * - the human-readable message
+ * - the type of change that happened
+ */
 private data class TaskChangeConfirmation(
     val taskId: String,
     val message: String,
     val type: TaskChangeType
 )
 
+/**
+ * Main admin screen for browsing and managing tasks.
+ *
+ * This screen supports:
+ * - searching tasks
+ * - loading / error / empty states
+ * - quick inline task edits (status, date, assignee)
+ * - deleting tasks
+ * - opening full task details
+ * - navigating to task creation
+ *
+ * Tasks are sorted so the most actionable items appear first:
+ * 1. Pending
+ * 2. In Progress
+ * 3. Completed
+ *
+ * Within each status group, newer dates are shown first.
+ */
 @Composable
 fun TasksScreen(
     tasks: List<TaskData>,
@@ -98,10 +131,20 @@ fun TasksScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // Search input used to filter visible tasks.
     var searchQuery by remember { mutableStateOf("") }
+
+    // Holds the task that is currently waiting for delete confirmation.
     var taskPendingDelete by remember { mutableStateOf<TaskData?>(null) }
+
+    // Controls the temporary "change saved" confirmation banner.
     var confirmation by remember { mutableStateOf<TaskChangeConfirmation?>(null) }
 
+    /**
+     * Automatically hide the confirmation banner after a short delay.
+     *
+     * This gives quick visual feedback without forcing the user to dismiss anything.
+     */
     LaunchedEffect(confirmation) {
         if (confirmation != null) {
             delay(2200)
@@ -109,6 +152,7 @@ fun TasksScreen(
         }
     }
 
+    // Search across the most useful fields so the admin can find tasks flexibly.
     val filteredTasks = tasks.filter { task ->
         searchQuery.isBlank() ||
                 task.customer.contains(searchQuery, ignoreCase = true) ||
@@ -120,6 +164,7 @@ fun TasksScreen(
                 taskStatusLabel(task.status).contains(searchQuery, ignoreCase = true)
     }
 
+    // Sort tasks by status priority, then by date descending inside each group.
     val sortedTasks = filteredTasks.sortedWith(
         compareBy<TaskData>(
             { statusSortOrder(it.status) },
@@ -137,6 +182,7 @@ fun TasksScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
         ) {
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -185,6 +231,7 @@ fun TasksScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
+                // Simple task search bar.
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -196,6 +243,7 @@ fun TasksScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // Main content area switches between loading, error, empty, and list states.
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -262,6 +310,7 @@ fun TasksScreen(
                                         onDeleteClick = { taskPendingDelete = task },
                                         onStatusChange = { newStatus ->
                                             onStatusChange(task.id, newStatus)
+
                                             confirmation = TaskChangeConfirmation(
                                                 taskId = task.id,
                                                 message = "Task status changed to ${taskStatusLabel(newStatus)}.",
@@ -271,6 +320,7 @@ fun TasksScreen(
                                         onQuickUpdateTask = { updatedTask, changeType ->
                                             onQuickUpdateTask(updatedTask)
 
+                                            // Build a human-friendly banner message based on what changed.
                                             confirmation = when (changeType) {
                                                 TaskChangeType.DATE -> TaskChangeConfirmation(
                                                     taskId = task.id,
@@ -300,6 +350,7 @@ fun TasksScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // Primary action button for creating a new task.
                 Button(
                     onClick = onCreateTaskClick,
                     modifier = Modifier
@@ -329,6 +380,7 @@ fun TasksScreen(
             )
         }
 
+        // Floating confirmation banner shown above the bottom nav.
         confirmation?.let { currentConfirmation ->
             TaskChangeConfirmationBanner(
                 message = currentConfirmation.message,
@@ -339,6 +391,7 @@ fun TasksScreen(
         }
     }
 
+    // Delete confirmation dialog.
     taskPendingDelete?.let { task ->
         AlertDialog(
             onDismissRequest = { taskPendingDelete = null },
@@ -365,6 +418,18 @@ fun TasksScreen(
     }
 }
 
+/**
+ * Reusable card showing a single task in the task list.
+ *
+ * This card supports quick admin actions directly from the list:
+ * - change status
+ * - change date
+ * - change assignee
+ * - delete task
+ * - open full task details
+ *
+ * The idea is to make common admin workflows fast without forcing a full detail view every time.
+ */
 @Composable
 private fun TaskCard(
     task: TaskData,
@@ -376,16 +441,20 @@ private fun TaskCard(
 ) {
     val context = LocalContext.current
 
+    // Controls for the two dropdown menus inside the card.
     var statusExpanded by remember { mutableStateOf(false) }
     var assignExpanded by remember { mutableStateOf(false) }
 
+    // Visual color of the status pill based on the current task state.
     val statusColor = when (task.status) {
         TaskStatus.PENDING -> Color(0xFFE5E7EB)
         TaskStatus.IN_PROGRESS -> Color(0xFFF2E2A8)
         TaskStatus.COMPLETED -> Color(0xFFC7EBC4)
     }
 
+    // Parse the current task date so the date picker can open on the existing value.
     val currentTaskDate = parseTaskDate(task.date)
+
     val calendar = remember(task.id, task.date) {
         Calendar.getInstance().apply {
             val parsedDate = currentTaskDate
@@ -397,6 +466,7 @@ private fun TaskCard(
         }
     }
 
+    // Native Android date picker used for quick inline date changes.
     val datePickerDialog = remember(task.id, task.date) {
         DatePickerDialog(
             context,
@@ -404,6 +474,8 @@ private fun TaskCard(
                 val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
                 val newDate = selectedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
 
+                // Only trigger an update if the normalized value actually changed.
+                // This avoids unnecessary writes caused by format differences.
                 if (normalizeTaskDate(task.date) != normalizeTaskDate(newDate)) {
                     onQuickUpdateTask(task.copy(date = newDate), TaskChangeType.DATE)
                 }
@@ -431,6 +503,7 @@ private fun TaskCard(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Status pill acts like a dropdown trigger.
             Box {
                 Box(
                     modifier = Modifier
@@ -478,6 +551,7 @@ private fun TaskCard(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Inline quick-edit row for date and assignee.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -485,6 +559,7 @@ private fun TaskCard(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Date section
             Row(
                 modifier = Modifier.clickable { datePickerDialog.show() },
                 verticalAlignment = Alignment.CenterVertically
@@ -521,6 +596,7 @@ private fun TaskCard(
 
             Spacer(modifier = Modifier.width(10.dp))
 
+            // Assignee section
             Box(
                 modifier = Modifier.weight(1f)
             ) {
@@ -582,6 +658,7 @@ private fun TaskCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Show a short preview of task details when available.
             if (task.taskDetails.isNotBlank()) {
                 Row(
                     modifier = Modifier.weight(1f),
@@ -621,6 +698,12 @@ private fun TaskCard(
     }
 }
 
+/**
+ * Small success/info banner shown after quick inline changes.
+ *
+ * This is intentionally lightweight and temporary so it confirms the action
+ * without interrupting the user's flow.
+ */
 @Composable
 private fun TaskChangeConfirmationBanner(
     message: String,
@@ -663,6 +746,9 @@ private fun TaskChangeConfirmationBanner(
     }
 }
 
+/**
+ * Converts enum values into human-friendly labels for the UI.
+ */
 private fun taskStatusLabel(status: TaskStatus): String {
     return when (status) {
         TaskStatus.PENDING -> "Pending"
@@ -671,6 +757,11 @@ private fun taskStatusLabel(status: TaskStatus): String {
     }
 }
 
+/**
+ * Defines the sort priority for task statuses.
+ *
+ * Lower number = appears earlier in the list.
+ */
 private fun statusSortOrder(status: TaskStatus): Int {
     return when (status) {
         TaskStatus.PENDING -> 0
@@ -679,11 +770,26 @@ private fun statusSortOrder(status: TaskStatus): Int {
     }
 }
 
+/**
+ * Converts a task date into an integer like yyyyMMdd for easy sorting.
+ *
+ * Returns 0 when parsing fails, which effectively sends invalid/unknown dates
+ * toward the end of date-based sorting.
+ */
 private fun dateToSortableNumber(date: String): Int {
     val parsedDate = parseTaskDate(date) ?: return 0
     return parsedDate.format(DateTimeFormatter.ofPattern("yyyyMMdd")).toIntOrNull() ?: 0
 }
 
+/**
+ * Tries to parse a task date using the supported formats used across the app.
+ *
+ * Supported:
+ * - dd/MM/yyyy
+ * - yyyy-MM-dd
+ *
+ * Returns null if parsing fails for all supported formats.
+ */
 private fun parseTaskDate(date: String): LocalDate? {
     val supportedFormats = listOf(
         DateTimeFormatter.ofPattern("dd/MM/yyyy"),
@@ -694,17 +800,29 @@ private fun parseTaskDate(date: String): LocalDate? {
         try {
             return LocalDate.parse(date, formatter)
         } catch (_: Exception) {
+            // Ignore parse failure and continue trying the next format.
         }
     }
 
     return null
 }
 
+/**
+ * Normalizes a task date into a consistent dd/MM/yyyy string when possible.
+ *
+ * This helps avoid false "changes" caused only by different input formats.
+ */
 private fun normalizeTaskDate(date: String): String {
     val parsedDate = parseTaskDate(date) ?: return date
     return parsedDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
 }
 
+/**
+ * Formats task dates for display in the UI.
+ *
+ * Right now this simply normalizes the value, but keeping it as a separate
+ * helper makes future display-format changes easier.
+ */
 private fun formatDateForDisplay(date: String): String {
     return normalizeTaskDate(date)
 }

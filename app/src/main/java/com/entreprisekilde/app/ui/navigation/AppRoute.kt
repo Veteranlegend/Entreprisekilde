@@ -24,14 +24,23 @@ import com.entreprisekilde.app.viewmodel.UsersViewModel
 
 @Composable
 fun EntreprisekildeApp() {
+    // Grab the Application instance from the current Compose context.
+    // UsersViewModel needs this, likely for auth/session handling or other
+    // app-level dependencies.
     val application = LocalContext.current.applicationContext as Application
 
+    // Repositories are created here and passed into the relevant ViewModels.
+    // These act as the data layer bridge between Firebase and the UI state.
     val userRepository = FirebaseUsersRepository()
     val tasksRepository = FirebaseTasksRepository()
     val messagesRepository = FirebaseMessagesRepository()
     val timesheetRepository = FirebaseTimesheetRepository()
     val notificationRepository = FirebaseNotificationRepository()
 
+    // UsersViewModel handles login state, logged-in user data, and auth checks.
+    //
+    // A custom factory is used because this ViewModel requires constructor params
+    // instead of a no-arg constructor.
     val usersViewModel: UsersViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -40,6 +49,7 @@ fun EntreprisekildeApp() {
         }
     )
 
+    // TasksViewModel for task-related screens and business logic.
     val tasksViewModel: TasksViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -48,6 +58,7 @@ fun EntreprisekildeApp() {
         }
     )
 
+    // MessagesViewModel handles chat/message state and live updates.
     val messagesViewModel: MessagesViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -56,6 +67,7 @@ fun EntreprisekildeApp() {
         }
     )
 
+    // TimesheetViewModel manages timesheet data and related actions.
     val timesheetViewModel: TimesheetViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -64,6 +76,7 @@ fun EntreprisekildeApp() {
         }
     )
 
+    // NotificationViewModel manages notification data and real-time listeners.
     val notificationViewModel: NotificationViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -72,15 +85,21 @@ fun EntreprisekildeApp() {
         }
     )
 
+    // Pull the two key auth-related values from the users ViewModel.
     val loggedInUser = usersViewModel.loggedInUser
     val isCheckingAuth = usersViewModel.isCheckingAuth
 
+    // Start observing authentication state once when the app composable enters.
+    // This is what decides whether we show login or route into the app.
     LaunchedEffect(Unit) {
         usersViewModel.startAuthObserver()
     }
 
+    // While auth is still being checked, do not render the app yet.
+    // Right now this exits early without showing a loading UI.
     if (isCheckingAuth) return
 
+    // No authenticated user yet -> show login screen.
     if (loggedInUser == null) {
         LoginScreen(
             errorMessage = usersViewModel.loginErrorMessage,
@@ -94,6 +113,11 @@ fun EntreprisekildeApp() {
         return
     }
 
+    // Once we have a logged-in user, start live listeners for user-specific
+    // notifications and messages.
+    //
+    // DisposableEffect ensures those listeners are cleaned up automatically
+    // when the logged-in user changes or this composable leaves composition.
     DisposableEffect(loggedInUser.id) {
         notificationViewModel.startListeningForUser(loggedInUser.id)
         messagesViewModel.startListeningForUser(loggedInUser.id)
@@ -104,6 +128,9 @@ fun EntreprisekildeApp() {
         }
     }
 
+    // Route the user into the correct app flow based on their role.
+    // Admins get the full admin navigation graph with all shared ViewModels.
+    // Everyone else is treated as an employee.
     if (loggedInUser.role.equals("admin", ignoreCase = true)) {
         AdminAppFlow(
             usersViewModel = usersViewModel,

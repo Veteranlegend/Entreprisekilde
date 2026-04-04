@@ -11,13 +11,46 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/**
+ * Demo/in-memory implementation of [MessagesRepository].
+ *
+ * This repository is useful during development and testing because it allows
+ * the messaging feature to work without Firebase/Firestore.
+ *
+ * Important:
+ * - Data only exists in memory while the app is running
+ * - Nothing is persisted permanently
+ * - This is mainly used to simulate real repository behavior
+ */
 class DemoMessagesRepository : MessagesRepository {
 
+    /**
+     * In-memory list of chat threads.
+     *
+     * We start with seeded demo data so the app already has conversations to show.
+     */
     private val messageThreads = DemoSeedData.createMessageThreads().toMutableList()
+
+    /**
+     * In-memory map of threadId -> messages in that thread.
+     *
+     * Each thread gets its own mutable message list so we can simulate sending,
+     * reading, and updating chat state locally.
+     */
     private val chatMessages = DemoSeedData.createChatMessages()
         .mapValues { (_, messages) -> messages.toMutableList() }
         .toMutableMap()
 
+    /**
+     * Returns all visible threads for a specific user.
+     *
+     * We only include threads where:
+     * - the user is a participant
+     * - the thread has not been soft-deleted for that user
+     *
+     * unreadCount is also recalculated from unreadCountByUser so the UI gets
+     * the correct user-specific unread value.
+     */
     override suspend fun getThreadsForUser(userId: String): List<MessageThread> {
         return messageThreads
             .filter { it.participantIds.contains(userId) && !it.deletedForUserIds.contains(userId) }
@@ -27,6 +60,13 @@ class DemoMessagesRepository : MessagesRepository {
             .sortedByDescending { it.updatedAt }
     }
 
+    /**
+     * Demo version of a real-time thread listener.
+     *
+     * Since this is not backed by Firestore, there is no actual live listener here.
+     * Instead, we immediately return the current data once and return an empty
+     * unsubscribe function.
+     */
     override fun startThreadsListener(
         userId: String,
         onUpdate: (List<MessageThread>) -> Unit,
@@ -43,6 +83,9 @@ class DemoMessagesRepository : MessagesRepository {
         return {}
     }
 
+    /**
+     * Returns all messages for a thread sorted from oldest to newest.
+     */
     override suspend fun getMessages(threadId: Int): List<ChatMessage> {
         return chatMessages[threadId]
             ?.sortedBy { it.createdAt }
@@ -50,6 +93,12 @@ class DemoMessagesRepository : MessagesRepository {
             ?: emptyList()
     }
 
+    /**
+     * Demo version of a real-time message listener.
+     *
+     * Same idea as startThreadsListener():
+     * we return the current messages once and provide a no-op unsubscribe function.
+     */
     override fun startMessagesListener(
         threadId: Int,
         onUpdate: (List<ChatMessage>) -> Unit,
@@ -64,6 +113,13 @@ class DemoMessagesRepository : MessagesRepository {
         return {}
     }
 
+    /**
+     * Marks the whole thread as read for the given user by resetting that user's
+     * unread count to 0.
+     *
+     * This only updates thread-level unread state.
+     * Individual message read tracking is handled separately in markMessagesAsRead().
+     */
     override suspend fun markThreadAsRead(
         threadId: Int,
         userId: String
@@ -81,6 +137,13 @@ class DemoMessagesRepository : MessagesRepository {
         )
     }
 
+    /**
+     * Marks each message in the thread as read for the given user.
+     *
+     * Rules:
+     * - We do not mark the user's own messages as read
+     * - We only add the user if not already present in readByUserIds
+     */
     override suspend fun markMessagesAsRead(
         threadId: Int,
         userId: String
@@ -96,6 +159,12 @@ class DemoMessagesRepository : MessagesRepository {
         }.toMutableList()
     }
 
+    /**
+     * Updates typing state for a user inside a thread.
+     *
+     * This simulates real-time "user is typing" behavior by adding/removing
+     * the user ID from typingUserIds.
+     */
     override suspend fun setTypingState(
         threadId: Int,
         userId: String,
@@ -120,6 +189,13 @@ class DemoMessagesRepository : MessagesRepository {
         )
     }
 
+    /**
+     * Soft-deletes a thread for the current user.
+     *
+     * The thread is not removed from the repository entirely.
+     * Instead, the current user's ID is added to deletedForUserIds so it becomes
+     * hidden only for that user.
+     */
     override suspend fun deleteThread(
         threadId: Int,
         currentUserId: String
@@ -139,6 +215,16 @@ class DemoMessagesRepository : MessagesRepository {
         )
     }
 
+    /**
+     * Sends a normal text message in a thread.
+     *
+     * What happens here:
+     * - trim the text
+     * - ignore empty messages
+     * - create a new message with a generated ID and timestamp
+     * - update the thread preview and unread counts
+     * - restore the thread for all users if it was previously soft-deleted
+     */
     override suspend fun sendMessage(
         threadId: Int,
         senderId: String,
@@ -150,6 +236,7 @@ class DemoMessagesRepository : MessagesRepository {
         val messagesForThread = chatMessages.getOrPut(threadId) { mutableListOf() }
         val allMessages = chatMessages.values.flatten()
 
+        // Generate next numeric message ID based on existing demo messages
         val newMessageId =
             ((allMessages.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString()
         val nowMillis = System.currentTimeMillis()
@@ -173,6 +260,8 @@ class DemoMessagesRepository : MessagesRepository {
             val oldThread = messageThreads[threadIndex]
             val updatedUnreadMap = oldThread.unreadCountByUser.toMutableMap()
 
+            // Sender should have 0 unread in this thread.
+            // Everyone else gets +1 unread.
             oldThread.participantIds.forEach { participantId ->
                 updatedUnreadMap[participantId] = if (participantId == senderId) {
                     0
@@ -192,6 +281,14 @@ class DemoMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Sends an image message in a thread.
+     *
+     * This follows the same flow as sendMessage(), but stores the image URI
+     * as imageUrl and sets the message type to IMAGE.
+     *
+     * For the thread preview, we show a placeholder text instead of the actual URI.
+     */
     override suspend fun sendImageMessage(
         threadId: Int,
         senderId: String,
@@ -200,6 +297,7 @@ class DemoMessagesRepository : MessagesRepository {
         val messagesForThread = chatMessages.getOrPut(threadId) { mutableListOf() }
         val allMessages = chatMessages.values.flatten()
 
+        // Generate next numeric message ID based on existing demo messages
         val newMessageId =
             ((allMessages.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1).toString()
         val nowMillis = System.currentTimeMillis()
@@ -223,6 +321,8 @@ class DemoMessagesRepository : MessagesRepository {
             val oldThread = messageThreads[threadIndex]
             val updatedUnreadMap = oldThread.unreadCountByUser.toMutableMap()
 
+            // Sender should have 0 unread in this thread.
+            // Everyone else gets +1 unread.
             oldThread.participantIds.forEach { participantId ->
                 updatedUnreadMap[participantId] = if (participantId == senderId) {
                     0
@@ -242,6 +342,13 @@ class DemoMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Finds a single thread by ID for the current user.
+     *
+     * Returns null if:
+     * - the thread does not exist
+     * - the thread was soft-deleted for this user
+     */
     override suspend fun findThreadById(
         threadId: Int,
         currentUserId: String
@@ -254,6 +361,15 @@ class DemoMessagesRepository : MessagesRepository {
         )
     }
 
+    /**
+     * Returns an existing 1-to-1 thread if one already exists.
+     * Otherwise, creates a new thread between the two users.
+     *
+     * Important behavior:
+     * - If the thread already exists but was deleted for the current user,
+     *   it becomes visible again
+     * - A newly created thread starts with empty messages and zero unread counts
+     */
     override suspend fun createOrGetThread(
         currentUserId: String,
         currentUserName: String,
@@ -270,6 +386,9 @@ class DemoMessagesRepository : MessagesRepository {
             val threadIndex = messageThreads.indexOfFirst { it.id == existingThread.id }
             if (threadIndex != -1) {
                 val oldThread = messageThreads[threadIndex]
+
+                // If the current user had previously deleted the thread,
+                // bring it back by removing them from deletedForUserIds
                 val updatedDeletedForUserIds = oldThread.deletedForUserIds.filter { it != currentUserId }
 
                 messageThreads[threadIndex] = oldThread.copy(
@@ -313,6 +432,12 @@ class DemoMessagesRepository : MessagesRepository {
         return newThread
     }
 
+    /**
+     * Formats a timestamp into UI-friendly HH:mm time.
+     *
+     * Example:
+     * 14:05
+     */
     private fun currentTime(nowMillis: Long): String {
         val localDateTime = LocalDateTime.ofInstant(
             Instant.ofEpochMilli(nowMillis),

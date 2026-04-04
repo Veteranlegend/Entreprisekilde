@@ -21,13 +21,53 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
+/**
+ * Firebase-backed implementation of [UserRepository].
+ *
+ * This repository handles:
+ * - login/logout
+ * - auth state observation
+ * - reading and updating users in Firestore
+ * - creating new auth users
+ * - changing the current user's password
+ * - syncing/removing FCM tokens during auth transitions
+ *
+ * Firebase Auth is used for authentication, while Firestore stores the
+ * app-specific user profile data.
+ */
 class FirebaseUsersRepository : UserRepository {
 
+    /**
+     * Firebase Authentication instance used for sign-in/sign-out and password work.
+     */
     private val auth = FirebaseAuth.getInstance()
+
+    /**
+     * Firestore instance used for user profile data.
+     */
     private val firestore = FirebaseFirestore.getInstance()
 
+    /**
+     * Active auth state listener reference.
+     *
+     * We keep this so we can remove the listener later and avoid leaking it.
+     */
     private var authStateListener: AuthStateListener? = null
 
+    /**
+     * Logs a user in using either:
+     * - email + password, or
+     * - username + password
+     *
+     * Behavior:
+     * - If the input contains "@", we treat it as an email login.
+     * - Otherwise, we first look up the user by username in Firestore,
+     *   then sign in using that user's email.
+     *
+     * After successful login:
+     * - we fetch the latest user data from Firestore
+     * - we sync the current FCM token to the logged-in user
+     */
     override suspend fun login(username: String, password: String): LoginResult {
         return try {
             val cleanInput = username.trim()
@@ -37,6 +77,7 @@ class FirebaseUsersRepository : UserRepository {
                 return LoginResult.Error("Please enter both username and password.")
             }
 
+            // Email login path
             if (cleanInput.contains("@")) {
                 val emailInput = cleanInput.lowercase()
 
@@ -45,6 +86,7 @@ class FirebaseUsersRepository : UserRepository {
                 val firebaseUid = auth.currentUser?.uid
                     ?: return LoginResult.Error("Login failed. Please try again.")
 
+                // Pull the freshest profile data directly from the server.
                 val userDoc = firestore.collection("users")
                     .document(firebaseUid)
                     .get(Source.SERVER)
@@ -52,6 +94,8 @@ class FirebaseUsersRepository : UserRepository {
 
                 val authEmail = auth.currentUser?.email.orEmpty()
 
+                // If the Firestore profile document does not exist yet, we still
+                // return a minimal fallback user so login can succeed gracefully.
                 val user = if (userDoc.exists()) {
                     documentToUser(userDoc)
                 } else {
@@ -71,6 +115,8 @@ class FirebaseUsersRepository : UserRepository {
 
                 LoginResult.Success(user)
             } else {
+                // Username login path:
+                // find the matching user profile first, then sign in with email.
                 val users = getUsers()
 
                 val matchedUser = users.firstOrNull {
@@ -94,6 +140,7 @@ class FirebaseUsersRepository : UserRepository {
                     .get(Source.SERVER)
                     .await()
 
+                // Prefer fresh Firestore data when available.
                 val latestUser = if (latestUserDoc.exists()) {
                     documentToUser(latestUserDoc)
                 } else {
@@ -119,6 +166,13 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
+    /**
+     * Deletes a user profile document from Firestore.
+     *
+     * Important:
+     * This currently deletes only the Firestore user document,
+     * not the Firebase Auth account itself.
+     */
     override suspend fun deleteUser(userId: String): Result<Unit> {
         return try {
             firestore.collection("users")
@@ -133,6 +187,12 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
+    /**
+     * Fetches a single user profile from Firestore by ID.
+     *
+     * We request from [Source.SERVER] so we get the latest server state
+     * instead of potentially stale cached data.
+     */
     override suspend fun getUserById(userId: String): User? {
         return try {
             val doc = firestore.collection("users")
@@ -147,10 +207,21 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
+    /**
+     * Returns the currently authenticated Firebase user's UID, if available.
+     */
     override fun getCurrentAuthUserId(): String? {
         return auth.currentUser?.uid
     }
 
+    /**
+     * Starts observing Firebase auth state changes.
+     *
+     * This is useful for app startup flows, login/logout handling,
+     * or navigation decisions based on whether a user is authenticated.
+     *
+     * We stop any previous listener first so only one listener stays active.
+     */
     override fun observeAuthState(onAuthUserChanged: (String?) -> Unit) {
         stopObservingAuthState()
 
@@ -163,6 +234,9 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
+    /**
+     * Stops observing auth state changes.
+     */
     override fun stopObservingAuthState() {
         authStateListener?.let { listener ->
             auth.removeAuthStateListener(listener)
@@ -170,6 +244,15 @@ class FirebaseUsersRepository : UserRepository {
         authStateListener = null
     }
 
+    /**
+     * Logs the current user out.
+     *
+     * Before signing out, we try to remove the current FCM token from the
+     * user's Firestore profile so this device stops receiving notifications
+     * intended for that logged-out account.
+     *
+     * This runs on an IO coroutine because it may do network work.
+     */
     override fun logout() {
         val currentUserId = auth.currentUser?.uid
 
@@ -181,11 +264,17 @@ class FirebaseUsersRepository : UserRepository {
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
+                // Always sign out even if token cleanup fails.
                 auth.signOut()
             }
         }
     }
 
+    /**
+     * Fetches all users from Firestore.
+     *
+     * Again, we use [Source.SERVER] to prefer the latest data from the backend.
+     */
     override suspend fun getUsers(): List<User> {
         return try {
             val snapshot = firestore.collection("users")
@@ -199,6 +288,21 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
+    /**
+     * Creates a new user account.
+     *
+     * This method performs several steps:
+     * 1. Clean and validate the input
+     * 2. Check that username and email are unique
+     * 3. Create a secondary Firebase app/auth instance
+     * 4. Create the Firebase Auth account there
+     * 5. Save the app-specific user profile in Firestore
+     *
+     * Why the secondary app?
+     * Creating a user with the main FirebaseAuth instance would switch the
+     * currently logged-in session to the new user. Using a secondary app avoids
+     * accidentally logging out the admin/current user who is creating the account.
+     */
     override suspend fun addUser(
         firstName: String,
         lastName: String,
@@ -252,6 +356,7 @@ class FirebaseUsersRepository : UserRepository {
                 return Result.failure(Exception("Email already exists."))
             }
 
+            // Extra safety check directly against Firebase Auth sign-in methods.
             val existingSignInMethods = auth.fetchSignInMethodsForEmail(cleanEmail).await()
             if (!existingSignInMethods.signInMethods.isNullOrEmpty()) {
                 return Result.failure(Exception("Email already exists."))
@@ -296,11 +401,22 @@ class FirebaseUsersRepository : UserRepository {
             Result.success(Unit)
         } catch (e: Exception) {
             e.printStackTrace()
+
+            // Clean up the secondary app if anything fails mid-process.
             secondaryApp?.delete()
+
             Result.failure(Exception(e.message ?: "Failed to create user."))
         }
     }
 
+    /**
+     * Updates an existing user's Firestore profile.
+     *
+     * Notes:
+     * - We check that the username is not already taken by another user.
+     * - We only write profile fields here, not the Firebase Auth password.
+     * - [SetOptions.merge] avoids wiping fields that are not included in this map.
+     */
     override suspend fun updateUser(updatedUser: User): Result<Unit> {
         return try {
             val cleanUsername = updatedUser.username.trim()
@@ -337,6 +453,14 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
+    /**
+     * Changes the currently logged-in user's password.
+     *
+     * Firebase requires re-authentication before sensitive operations like
+     * password updates, so we:
+     * 1. verify the current password using email credentials
+     * 2. call updatePassword with the new password
+     */
     override suspend fun changeOwnPassword(
         currentPassword: String,
         newPassword: String
@@ -372,6 +496,17 @@ class FirebaseUsersRepository : UserRepository {
         }
     }
 
+    /**
+     * Converts a Firestore document into a [User] model.
+     *
+     * We defensively trim strings and provide safe defaults so malformed or
+     * incomplete documents do not break the app.
+     *
+     * Also worth noting:
+     * - Password is intentionally returned as an empty string because we should
+     *   never read/store raw passwords from Firestore for app use.
+     * - If the stored "id" field is missing, we fall back to the document ID.
+     */
     private fun documentToUser(doc: DocumentSnapshot): User {
         return User(
             id = doc.get("id")?.toString()?.trim().orEmpty().ifBlank { doc.id },

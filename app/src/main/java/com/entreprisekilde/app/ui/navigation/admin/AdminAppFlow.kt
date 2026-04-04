@@ -42,9 +42,9 @@ import com.entreprisekilde.app.ui.admin.tasks.TaskDetailsScreen
 import com.entreprisekilde.app.ui.admin.tasks.TasksScreen
 import com.entreprisekilde.app.ui.admin.timesheet.TimesheetEmployeeListScreen
 import com.entreprisekilde.app.ui.admin.timesheet.TimesheetScreen
-import com.entreprisekilde.app.ui.admin.viewmodel.CreateUserScreen
-import com.entreprisekilde.app.ui.admin.viewmodel.EmployeeScreen
-import com.entreprisekilde.app.ui.admin.viewmodel.UserDetailsScreen
+import com.entreprisekilde.app.ui.admin.users.CreateUserScreen
+import com.entreprisekilde.app.ui.admin.users.EmployeeScreen
+import com.entreprisekilde.app.ui.admin.users.UserDetailsScreen
 import com.entreprisekilde.app.ui.notifications.NotificationScreen
 import com.entreprisekilde.app.viewmodel.MessagesViewModel
 import com.entreprisekilde.app.viewmodel.NotificationViewModel

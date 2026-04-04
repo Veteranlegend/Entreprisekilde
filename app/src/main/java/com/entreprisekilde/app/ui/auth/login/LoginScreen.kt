@@ -57,10 +57,35 @@ import androidx.compose.ui.unit.sp
 import com.entreprisekilde.app.R
 import kotlinx.coroutines.delay
 
+/**
+ * SharedPreferences file used to persist lightweight login UI state.
+ *
+ * Right now this is only used for "Remember me" + saved username.
+ */
 private const val LOGIN_PREFS = "login_prefs"
+
+/**
+ * Preference key for whether the user enabled "Remember me".
+ */
 private const val KEY_REMEMBER_ME = "remember_me"
+
+/**
+ * Preference key for the saved username value.
+ */
 private const val KEY_SAVED_USERNAME = "saved_username"
 
+/**
+ * Main login screen for the app.
+ *
+ * Responsibilities:
+ * - show the login form
+ * - restore remembered username if enabled
+ * - let the user toggle password visibility
+ * - show loading / locked states
+ * - surface error or info messages
+ *
+ * This composable is UI-only. Actual login logic is passed in through [onLoginClick].
+ */
 @Composable
 fun LoginScreen(
     onLoginClick: (String, String) -> Unit = { _, _ -> },
@@ -70,17 +95,34 @@ fun LoginScreen(
     isLocked: Boolean = false
 ) {
     val context = LocalContext.current
+
+    // We memoize SharedPreferences so we do not request it repeatedly
+    // on every recomposition.
     val prefs = remember {
         context.getSharedPreferences(LOGIN_PREFS, Context.MODE_PRIVATE)
     }
 
+    // Screen-local UI state
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(false) }
+
+    // This is the message actually shown in the small message box at the bottom.
+    // We keep it separate from the incoming error/info params so we can control
+    // timing and auto-dismiss behavior locally.
     var visibleMessage by remember { mutableStateOf<String?>(null) }
+
+    // Controls whether the message box should use error styling or info styling.
     var isErrorStyle by remember { mutableStateOf(false) }
 
+    /**
+     * On first composition, restore any remembered login state.
+     *
+     * Current behavior:
+     * - If "Remember me" was enabled, restore the saved username
+     * - Password is intentionally not stored
+     */
     LaunchedEffect(Unit) {
         val savedRememberMe = prefs.getBoolean(KEY_REMEMBER_ME, false)
         val savedUsername = prefs.getString(KEY_SAVED_USERNAME, "") ?: ""
@@ -91,6 +133,19 @@ fun LoginScreen(
         }
     }
 
+    /**
+     * React whenever the external message state changes.
+     *
+     * Priority:
+     * 1. errorMessage
+     * 2. infoMessage
+     * 3. no message
+     *
+     * Also:
+     * - Messages auto-hide after 4 seconds
+     * - Locked state keeps the message visible instead of dismissing it
+     *   (useful for rate-limited / temporary lockout scenarios)
+     */
     LaunchedEffect(errorMessage, infoMessage, isLocked) {
         when {
             !errorMessage.isNullOrBlank() -> {
@@ -113,6 +168,10 @@ fun LoginScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        /**
+         * Background image with a slight blur to push attention toward
+         * the login form while still keeping some visual character.
+         */
         Image(
             painter = painterResource(id = R.drawable.workshop_bg),
             contentDescription = "Background",
@@ -122,6 +181,11 @@ fun LoginScreen(
             contentScale = ContentScale.Crop
         )
 
+        /**
+         * Light dark overlay on top of the image.
+         *
+         * This improves readability without completely hiding the background.
+         */
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -131,7 +195,12 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+
+                // Makes the whole screen scrollable in case of smaller screens
+                // or when the keyboard is open.
                 .verticalScroll(rememberScrollState())
+
+                // Respect system bars + keyboard insets.
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .imePadding()
@@ -140,6 +209,9 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(78.dp))
 
+            /**
+             * App logo near the top.
+             */
             Image(
                 painter = painterResource(id = R.drawable.logo_entreprisekilden),
                 contentDescription = "Logo",
@@ -199,10 +271,17 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            /**
+             * "Remember me" row.
+             *
+             * If the user turns it off, we immediately remove any saved username
+             * from SharedPreferences so the next app launch starts clean.
+             */
             RememberMeRow(
                 checked = rememberMe,
                 onCheckedChange = { isChecked ->
                     rememberMe = isChecked
+
                     if (!isChecked) {
                         prefs.edit()
                             .putBoolean(KEY_REMEMBER_ME, false)
@@ -219,6 +298,8 @@ fun LoginScreen(
                     val cleanUsername = username.trim()
                     val cleanPassword = password.trim()
 
+                    // Save or clear "remember me" state before triggering login.
+                    // We only persist the username, never the password.
                     if (rememberMe) {
                         prefs.edit()
                             .putBoolean(KEY_REMEMBER_ME, true)
@@ -233,6 +314,8 @@ fun LoginScreen(
 
                     onLoginClick(cleanUsername, cleanPassword)
                 },
+
+                // Button is disabled while loading or when login is temporarily locked.
                 enabled = !isLoading && !isLocked,
                 modifier = Modifier
                     .width(290.dp)
@@ -260,9 +343,17 @@ fun LoginScreen(
                 }
             }
 
+            // Extra bottom space so the content breathes a bit and avoids
+            // feeling cramped against the bottom edge / system bars.
             Spacer(modifier = Modifier.height(100.dp))
         }
 
+        /**
+         * Floating message box shown near the bottom of the screen.
+         *
+         * Red-ish style = error
+         * Blue-ish style = info
+         */
         if (!visibleMessage.isNullOrBlank()) {
             Box(
                 modifier = Modifier
@@ -290,6 +381,12 @@ fun LoginScreen(
     }
 }
 
+/**
+ * Reusable "Remember me" row.
+ *
+ * The whole row is clickable, not just the checkbox, which makes it easier
+ * and nicer to use on mobile.
+ */
 @Composable
 private fun RememberMeRow(
     checked: Boolean,
@@ -336,6 +433,14 @@ private fun RememberMeRow(
     }
 }
 
+/**
+ * Reusable login input field used for both username and password.
+ *
+ * Why this exists:
+ * - keeps the screen composable cleaner
+ * - ensures both fields share the same look and spacing
+ * - supports optional password visibility toggle
+ */
 @Composable
 private fun LoginInputField(
     value: String,
@@ -371,17 +476,25 @@ private fun LoginInputField(
                 color = Color.Black,
                 fontSize = 15.sp
             ),
+
+            // Hide password characters unless the user explicitly reveals them.
             visualTransformation = if (isPassword && !passwordVisible) {
                 PasswordVisualTransformation()
             } else {
                 VisualTransformation.None
             },
+
+            // Switch keyboard type for password fields.
             keyboardOptions = if (isPassword) {
                 KeyboardOptions(keyboardType = KeyboardType.Password)
             } else {
                 KeyboardOptions.Default
             },
+
+            // Slightly narrower than the parent box so text + trailing icon
+            // have enough room to coexist comfortably.
             modifier = Modifier.width(250.dp),
+
             decorationBox = { innerTextField ->
                 Row(
                     modifier = Modifier.width(258.dp),
@@ -392,6 +505,8 @@ private fun LoginInputField(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.CenterStart
                     ) {
+                        // Manual placeholder because BasicTextField does not
+                        // provide one like TextField does.
                         if (value.isEmpty()) {
                             Text(
                                 text = placeholder,
@@ -399,6 +514,7 @@ private fun LoginInputField(
                                 fontSize = 15.sp
                             )
                         }
+
                         innerTextField()
                     }
 

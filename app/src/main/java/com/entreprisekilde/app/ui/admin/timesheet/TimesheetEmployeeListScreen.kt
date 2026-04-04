@@ -56,8 +56,18 @@ fun TimesheetEmployeeListScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // Keeps track of whatever the admin types into the search field.
+    // remember {} makes sure this value survives recomposition while the screen is active.
     var searchText by remember { mutableStateOf("") }
 
+    // Build the list that will actually be shown on screen.
+    //
+    // We:
+    // 1. remove duplicates, so the same employee does not appear multiple times,
+    // 2. sort alphabetically for a cleaner UX,
+    // 3. filter based on the current search text.
+    //
+    // If the search field is empty, we simply show the full cleaned list.
     val filteredEmployees = employees
         .distinct()
         .sorted()
@@ -69,8 +79,10 @@ fun TimesheetEmployeeListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
+            // Adds safe-area padding so content does not sit under notches/system bars.
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        // Top header bar with back navigation, title, and timesheet icon.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,6 +108,7 @@ fun TimesheetEmployeeListScreen(
                 color = Color.Black
             )
 
+            // Push the icon container to the far right.
             Spacer(modifier = Modifier.weight(1f))
 
             Box(
@@ -113,6 +126,9 @@ fun TimesheetEmployeeListScreen(
             }
         }
 
+        // Main screen content area.
+        // weight(1f) lets this section expand and take the remaining vertical space
+        // between the header and bottom navigation bar.
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -127,6 +143,7 @@ fun TimesheetEmployeeListScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Simple search field for filtering the employee list in real time.
             OutlinedTextField(
                 value = searchText,
                 onValueChange = { searchText = it },
@@ -149,6 +166,7 @@ fun TimesheetEmployeeListScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Shows the current number of matching employees after filtering.
             Text(
                 text = "${filteredEmployees.size} Results",
                 fontSize = 15.sp,
@@ -157,6 +175,8 @@ fun TimesheetEmployeeListScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // LazyColumn is used here so the list remains efficient even if the
+            // employee list grows large in the future.
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -170,6 +190,11 @@ fun TimesheetEmployeeListScreen(
             }
         }
 
+        // Shared bottom navigation used across the app.
+        //
+        // selectedItem is currently set to HOME, which likely matches the app's
+        // navigation structure. If this screen should highlight a different tab
+        // later, this is the place to change it.
         AppBottomNavBar(
             selectedItem = BottomNavDestination.HOME,
             unreadNotificationCount = unreadNotificationCount,
@@ -186,6 +211,8 @@ private fun EmployeeTimesheetCard(
     name: String,
     onClick: () -> Unit
 ) {
+    // Reusable row-style card representing one employee entry.
+    // Tapping the card opens that employee's timesheet flow/details.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -195,6 +222,7 @@ private fun EmployeeTimesheetCard(
             .padding(horizontal = 14.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Decorative icon/avatar area for the employee item.
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -210,6 +238,8 @@ private fun EmployeeTimesheetCard(
 
         Spacer(modifier = Modifier.width(12.dp))
 
+        // weight(1f) makes the name take up remaining space,
+        // which keeps the arrow pinned neatly to the right.
         Text(
             text = name,
             fontSize = 16.sp,

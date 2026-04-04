@@ -1,4 +1,4 @@
-package com.entreprisekilde.app.ui.admin.viewmodel
+package com.entreprisekilde.app.ui.admin.users
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*

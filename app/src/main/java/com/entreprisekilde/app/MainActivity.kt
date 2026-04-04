@@ -17,11 +17,16 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    // Runtime permission launcher for push notifications on newer Android versions.
+    // Once the user responds, we log the result and sync the FCM token if permission was granted.
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             Log.d("FCM", "POST_NOTIFICATIONS granted: $isGranted")
+
             if (isGranted) {
                 lifecycleScope.launch {
+                    // Now that notifications are allowed, make sure the current device token
+                    // is stored for the logged-in user so this device can receive push messages.
                     FcmTokenManager.syncCurrentTokenToLoggedInUser()
                 }
             }
@@ -30,9 +35,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Ask for notification permission when needed before the user gets too far into the app.
         requestNotificationPermissionIfNeeded()
 
         lifecycleScope.launch {
+            // Try to sync the current FCM token on app start.
+            // This helps keep the backend/device mapping up to date even if permission was already granted.
             FcmTokenManager.syncCurrentTokenToLoggedInUser()
         }
 
@@ -44,6 +52,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestNotificationPermissionIfNeeded() {
+        // Android 13+ requires POST_NOTIFICATIONS as a runtime permission.
+        // On older versions, this permission does not need to be requested this way.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val alreadyGranted = ContextCompat.checkSelfPermission(
                 this,

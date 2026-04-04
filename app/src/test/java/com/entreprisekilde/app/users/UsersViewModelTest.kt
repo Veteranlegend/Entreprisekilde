@@ -1,5 +1,7 @@
 package com.entreprisekilde.app.users
 
+import android.app.Application
+import android.content.SharedPreferences
 import com.entreprisekilde.app.data.model.auth.LoginResult
 import com.entreprisekilde.app.data.model.users.User
 import com.entreprisekilde.app.data.repository.users.UserRepository
@@ -20,21 +22,29 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class UsersViewModelTest {
 
+    // Test dispatcher used to make coroutine-based ViewModel logic deterministic.
+    // This gives the tests full control over when queued coroutines actually run.
     private val testDispatcher = StandardTestDispatcher()
+    private lateinit var application: Application
 
     @Before
     fun setUp() {
+        // Route Main dispatcher work to the test dispatcher.
         Dispatchers.setMain(testDispatcher)
+
+        // Use a lightweight fake Application so the ViewModel can still access
+        // SharedPreferences without needing a full Android runtime environment.
+        application = FakeTestApplication()
     }
 
     @After
     fun tearDown() {
+        // Always reset Main to avoid affecting other tests.
         Dispatchers.resetMain()
     }
 
     @Test
     fun init_loadsUsersIntoState() = runTest {
-        // Arrange
         val fakeUsers = listOf(
             User(
                 id = "1",
@@ -58,6 +68,8 @@ class UsersViewModelTest {
             )
         )
 
+        // Minimal fake repository for testing the ViewModel's initial user loading.
+        // Only the behavior relevant to this test is implemented meaningfully.
         val fakeRepository = object : UserRepository {
             override suspend fun getUsers() = fakeUsers
             override suspend fun login(username: String, password: String) = LoginResult.Error("Not needed")
@@ -82,11 +94,11 @@ class UsersViewModelTest {
             override suspend fun changeOwnPassword(currentPassword: String, newPassword: String) = Result.success(Unit)
         }
 
-        // Act
-        val viewModel = UsersViewModel(fakeRepository)
+        val viewModel = UsersViewModel(application, fakeRepository)
         advanceUntilIdle()
 
-        // Assert
+        // The ViewModel should expose the fetched users in the same order
+        // returned by the repository.
         assertEquals(2, viewModel.users.size)
         assertEquals("ahmad", viewModel.users[0].username)
         assertEquals("sara", viewModel.users[1].username)
@@ -94,7 +106,6 @@ class UsersViewModelTest {
 
     @Test
     fun selectUser_andClearSelectedUser_updateSelectedUserState() {
-        // Arrange
         val fakeRepository = object : UserRepository {
             override suspend fun getUsers() = emptyList<User>()
             override suspend fun login(username: String, password: String) = LoginResult.Error("Not needed")
@@ -119,7 +130,7 @@ class UsersViewModelTest {
             override suspend fun changeOwnPassword(currentPassword: String, newPassword: String) = Result.success(Unit)
         }
 
-        val viewModel = UsersViewModel(fakeRepository)
+        val viewModel = UsersViewModel(application, fakeRepository)
 
         val user = User(
             id = "1",
@@ -132,22 +143,17 @@ class UsersViewModelTest {
             role = "admin"
         )
 
-        // Act
+        // Selecting a user should update the ViewModel's selectedUser state.
         viewModel.selectUser(user)
-
-        // Assert
         assertEquals("ahmad", viewModel.selectedUser?.username)
 
-        // Act
+        // Clearing selection should put the state back to null.
         viewModel.clearSelectedUser()
-
-        // Assert
         assertEquals(null, viewModel.selectedUser)
     }
 
     @Test
     fun addUser_addsUserAndSetsSuccessMessage() = runTest {
-        // Arrange
         val fakeUsers = mutableListOf(
             User(
                 id = "1",
@@ -169,13 +175,9 @@ class UsersViewModelTest {
             }
 
             override suspend fun getUserById(userId: String): User? = null
-
             override fun getCurrentAuthUserId(): String? = null
-
             override fun observeAuthState(onAuthUserChanged: (String?) -> Unit) {}
-
             override fun stopObservingAuthState() {}
-
             override fun logout() {}
 
             override suspend fun addUser(
@@ -187,6 +189,7 @@ class UsersViewModelTest {
                 password: String,
                 role: String
             ): Result<Unit> {
+                // Simulate persistence by appending the new user to our in-memory list.
                 fakeUsers.add(
                     User(
                         id = "2",
@@ -203,19 +206,15 @@ class UsersViewModelTest {
             }
 
             override suspend fun updateUser(updatedUser: User): Result<Unit> = Result.success(Unit)
-
             override suspend fun deleteUser(userId: String): Result<Unit> = Result.success(Unit)
-
-            override suspend fun changeOwnPassword(
-                currentPassword: String,
-                newPassword: String
-            ): Result<Unit> = Result.success(Unit)
+            override suspend fun changeOwnPassword(currentPassword: String, newPassword: String): Result<Unit> =
+                Result.success(Unit)
         }
 
-        val viewModel = UsersViewModel(fakeRepository)
+        val viewModel = UsersViewModel(application, fakeRepository)
         advanceUntilIdle()
 
-        // Act
+        // Act: add a brand new user.
         viewModel.addUser(
             firstName = "Sara",
             lastName = "Hassan",
@@ -227,7 +226,7 @@ class UsersViewModelTest {
         )
         advanceUntilIdle()
 
-        // Assert
+        // Assert: the user list should grow and the success message should be set.
         assertEquals(2, viewModel.users.size)
         assertEquals("sara", viewModel.users[1].username)
         assertEquals("User created successfully.", viewModel.createUserMessage)
@@ -235,7 +234,6 @@ class UsersViewModelTest {
 
     @Test
     fun deleteUser_deletesUserClearsSelectionAndSetsSuccessMessage() = runTest {
-        // Arrange
         val fakeUsers = mutableListOf(
             User(
                 id = "1",
@@ -267,13 +265,9 @@ class UsersViewModelTest {
             }
 
             override suspend fun getUserById(userId: String): User? = null
-
             override fun getCurrentAuthUserId(): String? = null
-
             override fun observeAuthState(onAuthUserChanged: (String?) -> Unit) {}
-
             override fun stopObservingAuthState() {}
-
             override fun logout() {}
 
             override suspend fun addUser(
@@ -289,26 +283,26 @@ class UsersViewModelTest {
             override suspend fun updateUser(updatedUser: User): Result<Unit> = Result.success(Unit)
 
             override suspend fun deleteUser(userId: String): Result<Unit> {
+                // Simulate deletion by removing the matching user from memory.
                 fakeUsers.removeAll { it.id == userId }
                 return Result.success(Unit)
             }
 
-            override suspend fun changeOwnPassword(
-                currentPassword: String,
-                newPassword: String
-            ): Result<Unit> = Result.success(Unit)
+            override suspend fun changeOwnPassword(currentPassword: String, newPassword: String): Result<Unit> =
+                Result.success(Unit)
         }
 
-        val viewModel = UsersViewModel(fakeRepository)
+        val viewModel = UsersViewModel(application, fakeRepository)
         advanceUntilIdle()
 
+        // Select the user first so we can verify deletion also clears selection.
         viewModel.selectUser(viewModel.users.first { it.id == "2" })
 
-        // Act
         viewModel.deleteUser("2")
         advanceUntilIdle()
 
-        // Assert
+        // The deleted user should be gone, selection should be cleared,
+        // and a success message should be exposed.
         assertEquals(1, viewModel.users.size)
         assertTrue(viewModel.users.none { it.id == "2" })
         assertEquals(null, viewModel.selectedUser)
@@ -317,7 +311,6 @@ class UsersViewModelTest {
 
     @Test
     fun login_whenSuccessful_setsLoggedInUser() = runTest {
-        // Arrange
         val loggedIn = User(
             id = "1",
             firstName = "Ahmad",
@@ -337,13 +330,9 @@ class UsersViewModelTest {
             }
 
             override suspend fun getUserById(userId: String): User? = null
-
             override fun getCurrentAuthUserId(): String? = null
-
             override fun observeAuthState(onAuthUserChanged: (String?) -> Unit) {}
-
             override fun stopObservingAuthState() {}
-
             override fun logout() {}
 
             override suspend fun addUser(
@@ -357,32 +346,25 @@ class UsersViewModelTest {
             ): Result<Unit> = Result.success(Unit)
 
             override suspend fun updateUser(updatedUser: User): Result<Unit> = Result.success(Unit)
-
             override suspend fun deleteUser(userId: String): Result<Unit> = Result.success(Unit)
-
-            override suspend fun changeOwnPassword(
-                currentPassword: String,
-                newPassword: String
-            ): Result<Unit> = Result.success(Unit)
+            override suspend fun changeOwnPassword(currentPassword: String, newPassword: String): Result<Unit> =
+                Result.success(Unit)
         }
 
-        val viewModel = UsersViewModel(fakeRepository)
+        val viewModel = UsersViewModel(application, fakeRepository)
         advanceUntilIdle()
 
-        // Act
         viewModel.login("ahmad", "123456")
         advanceUntilIdle()
 
-        // Assert
+        // Successful login should populate the logged-in user and leave no error.
         assertEquals("ahmad", viewModel.loggedInUser?.username)
         assertEquals(null, viewModel.loginErrorMessage)
         assertEquals(false, viewModel.isLoading)
     }
 
-
     @Test
     fun login_whenCredentialsAreWrong_setsErrorMessages() = runTest {
-        // Arrange
         val fakeRepository = object : UserRepository {
             override suspend fun getUsers(): List<User> = emptyList()
 
@@ -391,13 +373,9 @@ class UsersViewModelTest {
             }
 
             override suspend fun getUserById(userId: String): User? = null
-
             override fun getCurrentAuthUserId(): String? = null
-
             override fun observeAuthState(onAuthUserChanged: (String?) -> Unit) {}
-
             override fun stopObservingAuthState() {}
-
             override fun logout() {}
 
             override suspend fun addUser(
@@ -411,23 +389,18 @@ class UsersViewModelTest {
             ): Result<Unit> = Result.success(Unit)
 
             override suspend fun updateUser(updatedUser: User): Result<Unit> = Result.success(Unit)
-
             override suspend fun deleteUser(userId: String): Result<Unit> = Result.success(Unit)
-
-            override suspend fun changeOwnPassword(
-                currentPassword: String,
-                newPassword: String
-            ): Result<Unit> = Result.success(Unit)
+            override suspend fun changeOwnPassword(currentPassword: String, newPassword: String): Result<Unit> =
+                Result.success(Unit)
         }
 
-        val viewModel = UsersViewModel(fakeRepository)
+        val viewModel = UsersViewModel(application, fakeRepository)
         advanceUntilIdle()
 
-        // Act
         viewModel.login("wrongUser", "wrongPassword")
         advanceUntilIdle()
 
-        // Assert
+        // Failed login should keep loggedInUser null and expose the expected messages.
         assertEquals(null, viewModel.loggedInUser)
         assertEquals("Invalid username or password.", viewModel.loginErrorMessage)
         assertEquals("Please try again.", viewModel.loginInfoMessage)
@@ -436,7 +409,6 @@ class UsersViewModelTest {
 
     @Test
     fun logout_clearsUserAndResetsState() = runTest {
-        // Arrange
         val user = User(
             id = "1",
             firstName = "Ahmad",
@@ -456,13 +428,9 @@ class UsersViewModelTest {
             }
 
             override suspend fun getUserById(userId: String): User? = null
-
             override fun getCurrentAuthUserId(): String? = null
-
             override fun observeAuthState(onAuthUserChanged: (String?) -> Unit) {}
-
             override fun stopObservingAuthState() {}
-
             override fun logout() {}
 
             override suspend fun addUser(
@@ -476,26 +444,21 @@ class UsersViewModelTest {
             ): Result<Unit> = Result.success(Unit)
 
             override suspend fun updateUser(updatedUser: User): Result<Unit> = Result.success(Unit)
-
             override suspend fun deleteUser(userId: String): Result<Unit> = Result.success(Unit)
-
-            override suspend fun changeOwnPassword(
-                currentPassword: String,
-                newPassword: String
-            ): Result<Unit> = Result.success(Unit)
+            override suspend fun changeOwnPassword(currentPassword: String, newPassword: String): Result<Unit> =
+                Result.success(Unit)
         }
 
-        val viewModel = UsersViewModel(fakeRepository)
+        val viewModel = UsersViewModel(application, fakeRepository)
         advanceUntilIdle()
 
-        // Simulate logged in state
+        // First log in successfully.
         viewModel.login("ahmad", "123456")
         advanceUntilIdle()
 
-        // Act
+        // Then log out and verify the auth-related UI state has been reset.
         viewModel.logout()
 
-        // Assert
         assertEquals(null, viewModel.loggedInUser)
         assertEquals(null, viewModel.loginErrorMessage)
         assertEquals(null, viewModel.loginInfoMessage)
@@ -503,4 +466,128 @@ class UsersViewModelTest {
         assertEquals(false, viewModel.isLocked)
     }
 
+    // Small fake Application that always returns the same in-memory SharedPreferences.
+    // This avoids Android framework complexity while still supporting preference-based logic.
+    private class FakeTestApplication : Application() {
+        private val prefs = InMemorySharedPreferences()
+
+        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
+            return prefs
+        }
+    }
+
+    // Very lightweight in-memory SharedPreferences implementation for tests.
+    // Useful when the ViewModel or repository expects preferences to exist, but we
+    // do not want to rely on device/emulator storage.
+    private class InMemorySharedPreferences : SharedPreferences {
+        private val data = mutableMapOf<String, Any?>()
+
+        override fun getAll(): MutableMap<String, *> = data.toMutableMap()
+
+        override fun getString(key: String?, defValue: String?): String? {
+            return data[key] as? String ?: defValue
+        }
+
+        override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? {
+            @Suppress("UNCHECKED_CAST")
+            return (data[key] as? MutableSet<String>) ?: defValues
+        }
+
+        override fun getInt(key: String?, defValue: Int): Int {
+            return data[key] as? Int ?: defValue
+        }
+
+        override fun getLong(key: String?, defValue: Long): Long {
+            return data[key] as? Long ?: defValue
+        }
+
+        override fun getFloat(key: String?, defValue: Float): Float {
+            return data[key] as? Float ?: defValue
+        }
+
+        override fun getBoolean(key: String?, defValue: Boolean): Boolean {
+            return data[key] as? Boolean ?: defValue
+        }
+
+        override fun contains(key: String?): Boolean {
+            return data.containsKey(key)
+        }
+
+        override fun edit(): SharedPreferences.Editor {
+            return Editor(data)
+        }
+
+        override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+
+        override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+
+        private class Editor(
+            private val data: MutableMap<String, Any?>
+        ) : SharedPreferences.Editor {
+
+            private val pending = mutableMapOf<String, Any?>()
+            private var clearAll = false
+
+            override fun putString(key: String?, value: String?): SharedPreferences.Editor {
+                pending[key.orEmpty()] = value
+                return this
+            }
+
+            override fun putStringSet(key: String?, values: MutableSet<String>?): SharedPreferences.Editor {
+                pending[key.orEmpty()] = values
+                return this
+            }
+
+            override fun putInt(key: String?, value: Int): SharedPreferences.Editor {
+                pending[key.orEmpty()] = value
+                return this
+            }
+
+            override fun putLong(key: String?, value: Long): SharedPreferences.Editor {
+                pending[key.orEmpty()] = value
+                return this
+            }
+
+            override fun putFloat(key: String?, value: Float): SharedPreferences.Editor {
+                pending[key.orEmpty()] = value
+                return this
+            }
+
+            override fun putBoolean(key: String?, value: Boolean): SharedPreferences.Editor {
+                pending[key.orEmpty()] = value
+                return this
+            }
+
+            override fun remove(key: String?): SharedPreferences.Editor {
+                pending[key.orEmpty()] = null
+                return this
+            }
+
+            override fun clear(): SharedPreferences.Editor {
+                clearAll = true
+                return this
+            }
+
+            override fun commit(): Boolean {
+                apply()
+                return true
+            }
+
+            override fun apply() {
+                // clear() wipes existing values before pending changes are applied.
+                if (clearAll) {
+                    data.clear()
+                }
+
+                // Apply all staged edits to the in-memory map.
+                pending.forEach { (key, value) ->
+                    if (value == null) {
+                        data.remove(key)
+                    } else {
+                        data[key] = value
+                    }
+                }
+            }
+        }
+    }
 }

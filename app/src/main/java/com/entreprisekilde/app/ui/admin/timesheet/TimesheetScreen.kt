@@ -81,19 +81,32 @@ fun TimesheetScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // Controls whether the "Assign Shift" dialog is visible.
     var showAssignDialog by remember { mutableStateOf(false) }
+
+    // Keeps track of which entry is currently selected for delete / undo actions.
+    // We store the id first, then confirm the action in a dialog.
     var deleteTargetId by remember { mutableStateOf<String?>(null) }
     var undoTargetId by remember { mutableStateOf<String?>(null) }
+
+    // Dialog visibility flags for destructive or status-reset actions.
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showUndoDialog by remember { mutableStateOf(false) }
+
+    // Only one upcoming shift card can be expanded at a time.
+    // rememberSaveable helps preserve this state during config changes.
     var expandedUpcomingEntryId by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // Date range filters shown at the top of the screen.
+    // These are stored as strings because the UI field displays formatted text.
     var fromDateFilter by rememberSaveable { mutableStateOf("") }
     var toDateFilter by rememberSaveable { mutableStateOf("") }
 
+    // Parse filter values once so the rest of the screen can work with LocalDate safely.
     val fromDateParsed = parseOptionalTimesheetDate(fromDateFilter)
     val toDateParsed = parseOptionalTimesheetDate(toDateFilter)
 
+    // Apply date filtering first before grouping or summarizing entries.
     val filteredEntries = timesheets.filter { entry ->
         val entryDate = parseTimesheetDate(entry.date)
         val matchesFromDate = fromDateParsed?.let { !entryDate.isBefore(it) } ?: true
@@ -101,12 +114,16 @@ fun TimesheetScreen(
         matchesFromDate && matchesToDate
     }
 
+    // Newest entries first so the list feels natural to browse.
     val sortedEntries = filteredEntries.sortedByDescending { parseTimesheetDate(it.date) }
 
+    // Future pending shifts are shown separately because they are not yet worked,
+    // but still need admin review / approval logic in this UI.
     val upcomingEntries = sortedEntries.filter {
         classifyShift(it.date) == "future" && it.approvalStatus == ShiftApprovalStatus.PENDING
     }
 
+    // Pending entries that are today or in the past go into the review section.
     val pendingEntries = sortedEntries.filter {
         classifyShift(it.date) != "future" && it.approvalStatus == ShiftApprovalStatus.PENDING
     }
@@ -119,10 +136,13 @@ fun TimesheetScreen(
         it.approvalStatus == ShiftApprovalStatus.DECLINED
     }
 
+    // Approved time total only counts shifts that were actually approved.
     val approvedMinutesTotal = approvedEntries.sumOf {
         durationInMinutes(it.fromTime, it.toTime)
     }
 
+    // Assigned time total includes everything except declined shifts.
+    // This gives a quick overview of how much time has been allocated.
     val assignedMinutesTotal = sortedEntries
         .filter { it.approvalStatus != ShiftApprovalStatus.DECLINED }
         .sumOf { durationInMinutes(it.fromTime, it.toTime) }
@@ -135,6 +155,7 @@ fun TimesheetScreen(
             .background(Color(0xFFF7F7F7))
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        // Top header bar with back navigation and employee context.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -162,6 +183,8 @@ fun TimesheetScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Currently decorative / placeholder-style edit icon.
+            // Kept visible as part of the current UI design.
             Box(
                 modifier = Modifier
                     .size(42.dp)
@@ -190,6 +213,7 @@ fun TimesheetScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Date filter header row with optional clear action.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -220,6 +244,8 @@ fun TimesheetScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            // From/To date range pickers.
+            // The "From" field can limit the earliest valid "To" date and vice versa.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -236,6 +262,8 @@ fun TimesheetScreen(
                         val newFromDate = parseOptionalTimesheetDate(selected)
                         val currentToDate = parseOptionalTimesheetDate(toDateFilter)
 
+                        // If the new start date is after the current end date,
+                        // reset the end date to avoid an invalid date range.
                         if (
                             newFromDate != null &&
                             currentToDate != null &&
@@ -260,6 +288,7 @@ fun TimesheetScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Quick summary row: total results plus total assigned/approved time.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
@@ -313,6 +342,7 @@ fun TimesheetScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Main content list grouped into clear review sections.
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -413,6 +443,7 @@ fun TimesheetScreen(
                     }
                 }
 
+                // Friendly empty state depending on whether a filter is active.
                 if (sortedEntries.isEmpty()) {
                     item {
                         Text(
@@ -430,6 +461,7 @@ fun TimesheetScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Primary CTA for manually assigning a new shift.
             Button(
                 onClick = { showAssignDialog = true },
                 modifier = Modifier
@@ -465,6 +497,7 @@ fun TimesheetScreen(
         )
     }
 
+    // Dialog for creating a new shift assignment.
     if (showAssignDialog) {
         AssignShiftDialog(
             employeeName = employeeName,
@@ -476,6 +509,7 @@ fun TimesheetScreen(
         )
     }
 
+    // Confirmation dialog before deleting an entry.
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -522,6 +556,7 @@ fun TimesheetScreen(
         )
     }
 
+    // Confirmation dialog for moving approved/declined entries back to pending.
     if (showUndoDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -583,6 +618,8 @@ private fun DateFilterField(
     val interactionSource = remember { MutableInteractionSource() }
 
     fun openDatePicker() {
+        // Prefer the current field value as the initial picker date.
+        // If the field is empty, fall back to min/max constraints, then today.
         val initialDate = parseOptionalTimesheetDate(value)
             ?: minDate
             ?: maxDate
@@ -599,6 +636,7 @@ private fun DateFilterField(
             initialDate.dayOfMonth
         )
 
+        // Apply optional range limits so users can only pick valid dates.
         minDate?.let {
             dialog.datePicker.minDate = it
                 .atStartOfDay(ZoneId.systemDefault())
@@ -626,6 +664,8 @@ private fun DateFilterField(
 
         Spacer(modifier = Modifier.height(3.dp))
 
+        // Using a clickable Box around a disabled text field gives us
+        // the visual style of a field while keeping date selection controlled.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -710,12 +750,16 @@ private fun TimesheetCard(
 ) {
     val shiftType = classifyShift(entry.date)
 
+    // For future shifts we display the actual date.
+    // For today's shift we simplify the label to "Today".
     val topLabel = when {
         shiftType == "future" -> prettyTimesheetDate(entry.date)
         shiftType == "today" -> "Today"
         else -> prettyTimesheetDate(entry.date)
     }
 
+    // Border and chip colors are driven by both time position and approval status
+    // to make the card state easy to scan visually.
     val borderColor = when {
         shiftType == "future" && entry.approvalStatus == ShiftApprovalStatus.PENDING -> Color(0xFF8BB8F2)
         entry.approvalStatus == ShiftApprovalStatus.APPROVED -> Color(0xFF88C999)
@@ -827,6 +871,7 @@ private fun TimesheetCard(
             }
         }
 
+        // Small hint shown only for collapsible future shifts.
         if (expandable && !showActions) {
             Spacer(modifier = Modifier.height(10.dp))
             Text(
@@ -836,6 +881,7 @@ private fun TimesheetCard(
             )
         }
 
+        // Review actions for pending items.
         if (showActions) {
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -881,6 +927,7 @@ private fun TimesheetCard(
             }
         }
 
+        // Undo action shown for already finalized entries.
         if (showUndo) {
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -910,11 +957,14 @@ private fun AssignShiftDialog(
     onDismiss: () -> Unit,
     onAssign: (TimesheetEntry) -> Unit
 ) {
+    // Default to tomorrow so the admin can quickly assign an upcoming shift.
     var date by remember {
         mutableStateOf(
             LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
         )
     }
+
+    // These are string-based to keep the dialog flexible with existing helper parsers.
     var fromTime by remember { mutableStateOf("09:30 AM") }
     var toTime by remember { mutableStateOf("06:30 PM") }
     var assignedHours by remember { mutableStateOf("9") }
@@ -925,6 +975,8 @@ private fun AssignShiftDialog(
             TextButton(
                 onClick = {
                     val hours = assignedHours.toIntOrNull() ?: 0
+
+                    // Creates a pending entry that can later be reviewed/approved.
                     onAssign(
                         TimesheetEntry(
                             date = date,
@@ -978,6 +1030,9 @@ private fun AssignShiftDialog(
     )
 }
 
+// Returns whether a shift date is in the past, today, or the future.
+// If parsing fails, we treat it as past so the UI does not accidentally
+// classify invalid data as an upcoming shift.
 private fun classifyShift(date: String): String {
     return try {
         val parsedDate = parseTimesheetDate(date)
@@ -992,6 +1047,8 @@ private fun classifyShift(date: String): String {
     }
 }
 
+// Parses a timesheet date using the formats currently supported by the app.
+// If parsing fails for every known pattern, LocalDate.MIN is used as a safe fallback.
 private fun parseTimesheetDate(date: String): LocalDate {
     val patterns = listOf("dd/MM/yyyy", "yyyy-MM-dd")
 
@@ -999,18 +1056,23 @@ private fun parseTimesheetDate(date: String): LocalDate {
         try {
             return LocalDate.parse(date, DateTimeFormatter.ofPattern(pattern))
         } catch (_: Exception) {
+            // Ignore and continue trying the next supported format.
         }
     }
 
     return LocalDate.MIN
 }
 
+// Same as parseTimesheetDate, but returns null for blank or invalid values.
+// Useful for optional filter fields where "no value" should stay truly optional.
 private fun parseOptionalTimesheetDate(date: String): LocalDate? {
     if (date.isBlank()) return null
     val parsed = parseTimesheetDate(date)
     return if (parsed == LocalDate.MIN) null else parsed
 }
 
+// Converts a stored date string into a nicer UI label.
+// Keeps the original string if parsing fails so the UI still shows something meaningful.
 private fun prettyTimesheetDate(date: String): String {
     return try {
         val parsed = parseTimesheetDate(date)
@@ -1026,6 +1088,8 @@ private fun prettyTimesheetDate(date: String): String {
     }
 }
 
+// Parses time values in a few accepted formats because times can come in
+// either 12-hour or 24-hour style depending on where they were entered.
 private fun parseFlexibleTime(value: String): LocalTime? {
     val patterns = listOf("hh:mm a", "h:mm a", "HH:mm")
 
@@ -1033,12 +1097,15 @@ private fun parseFlexibleTime(value: String): LocalTime? {
         try {
             return LocalTime.parse(value, DateTimeFormatter.ofPattern(pattern))
         } catch (_: Exception) {
+            // Ignore and continue trying the next supported format.
         }
     }
 
     return null
 }
 
+// Returns a display-ready duration like 09:00.
+// If either time cannot be parsed, the UI falls back to 00:00.
 private fun calculateDuration(from: String, to: String): String {
     return try {
         val start = parseFlexibleTime(from) ?: return "00:00"
@@ -1054,6 +1121,7 @@ private fun calculateDuration(from: String, to: String): String {
     }
 }
 
+// Same duration calculation as above, but returned as raw minutes for totals.
 private fun durationInMinutes(from: String, to: String): Int {
     return try {
         val start = parseFlexibleTime(from) ?: return 0
@@ -1064,6 +1132,7 @@ private fun durationInMinutes(from: String, to: String): Int {
     }
 }
 
+// Formats a total minute count back into HH:mm for summary labels.
 private fun minutesToDurationString(totalMinutes: Int): String {
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60

@@ -18,15 +18,18 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimesheetViewModelTest {
 
+    // Test dispatcher lets us control coroutine execution manually in each test.
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
+        // Replace Main dispatcher so ViewModel coroutines run on the test dispatcher.
         Dispatchers.setMain(testDispatcher)
     }
 
     @After
     fun tearDown() {
+        // Restore the original Main dispatcher after each test.
         Dispatchers.resetMain()
     }
 
@@ -79,6 +82,8 @@ class TimesheetViewModelTest {
         advanceUntilIdle()
 
         // Assert
+        // The ViewModel should load employees on init,
+        // select the default employee, and fetch that employee's entries.
         assertEquals(2, viewModel.employees.size)
         assertEquals("Rasmus Jensen", viewModel.selectedEmployee.value)
         assertEquals(2, viewModel.entriesForSelectedEmployee.size)
@@ -138,10 +143,13 @@ class TimesheetViewModelTest {
         advanceUntilIdle()
 
         // Assert
+        // After changing the selected employee,
+        // only that employee's entries should be loaded into the UI state.
         assertEquals("Ahmad Ali", viewModel.selectedEmployee.value)
         assertEquals(1, viewModel.entriesForSelectedEmployee.size)
         assertEquals("e2", viewModel.entriesForSelectedEmployee[0].id)
     }
+
     @Test
     fun approveEntry_updatesEntryStatusToApproved() = runTest {
         // Arrange
@@ -192,6 +200,8 @@ class TimesheetViewModelTest {
         advanceUntilIdle()
 
         // Assert
+        // Approving an entry should refresh local state
+        // so the changed approval status is visible immediately.
         assertEquals(1, viewModel.entriesForSelectedEmployee.size)
         assertEquals(
             ShiftApprovalStatus.APPROVED,
@@ -233,6 +243,8 @@ class TimesheetViewModelTest {
             override suspend fun deleteEntry(entryId: String) {
                 fakeEntries.removeAll { it.id == entryId }
 
+                // Rebuild the employee list based on remaining entries.
+                // This mimics how the real repository might behave after deletion.
                 val remainingEmployees = fakeEntries.map { it.employeeName }.distinct()
                 fakeEmployees.clear()
                 fakeEmployees.addAll(remainingEmployees)
@@ -253,10 +265,10 @@ class TimesheetViewModelTest {
         advanceUntilIdle()
 
         // Assert
+        // Deleting the only entry should also remove the only employee from the refreshed list.
         assertEquals(0, viewModel.entriesForSelectedEmployee.size)
         assertEquals(0, viewModel.employees.size)
     }
-
 
     @Test
     fun assignShift_addsEntry_andRefreshesEntriesAndEmployees() = runTest {
@@ -304,6 +316,8 @@ class TimesheetViewModelTest {
             override suspend fun assignShift(newEntry: TimesheetEntry) {
                 fakeEntries.add(newEntry)
 
+                // Refresh the employee source as well,
+                // even though in this case the employee already exists.
                 val updatedEmployees = fakeEntries.map { it.employeeName }.distinct()
                 fakeEmployees.clear()
                 fakeEmployees.addAll(updatedEmployees)
@@ -322,6 +336,8 @@ class TimesheetViewModelTest {
         advanceUntilIdle()
 
         // Assert
+        // The newly assigned shift should appear in the selected employee's entries,
+        // and the employee list should still be valid after refresh.
         assertEquals(2, viewModel.entriesForSelectedEmployee.size)
         assertEquals("e2", viewModel.entriesForSelectedEmployee[1].id)
         assertEquals(1, viewModel.employees.size)

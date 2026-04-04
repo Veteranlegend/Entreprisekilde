@@ -1,4 +1,4 @@
-package com.entreprisekilde.app.ui.admin.viewmodel
+package com.entreprisekilde.app.ui.admin.users
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -66,17 +66,26 @@ fun UserDetailsScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // UI state for edit/save/delete flow.
+    //
+    // Using remember(user.id) means these values reset whenever a different user
+    // is opened on this screen, which prevents old screen state from leaking
+    // into the next user's details.
     var isEditing by remember(user.id) { mutableStateOf(false) }
     var isSaving by remember(user.id) { mutableStateOf(false) }
     var showSuccessDialog by remember(user.id) { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember(user.id) { mutableStateOf(false) }
 
+    // Local editable copies of the user fields.
+    // We edit these in the UI first, then build a new User object when saving.
     var email by remember(user.id) { mutableStateOf(user.email) }
     var firstName by remember(user.id) { mutableStateOf(user.firstName) }
     var lastName by remember(user.id) { mutableStateOf(user.lastName) }
     var phoneNumber by remember(user.id) { mutableStateOf(user.phoneNumber) }
     var username by remember(user.id) { mutableStateOf(user.username) }
 
+    // Whenever the selected user changes, sync all local state with the new user.
+    // This is a good safeguard in case the same screen instance is reused.
     LaunchedEffect(user.id) {
         email = user.email
         firstName = user.firstName
@@ -86,9 +95,12 @@ fun UserDetailsScreen(
         isEditing = false
         isSaving = false
         showDeleteConfirmDialog = false
+
+        // Clear any stale delete message when entering a new user record.
         onClearDeleteMessage()
     }
 
+    // Simple success dialog shown after a save action completes locally.
     if (showSuccessDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -118,9 +130,13 @@ fun UserDetailsScreen(
         )
     }
 
+    // Confirmation dialog before deleting the user.
+    // The wording changes slightly if the admin is looking at their own account.
     if (showDeleteConfirmDialog) {
         AlertDialog(
             onDismissRequest = {
+                // Prevent the dialog from being dismissed while a delete operation
+                // is actively running. This helps avoid weird UI states.
                 if (!isDeleting) {
                     showDeleteConfirmDialog = false
                 }
@@ -173,8 +189,10 @@ fun UserDetailsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
+            // Keeps content below the system status bar.
             .statusBarsPadding()
     ) {
+        // Top app bar / header area.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -184,6 +202,7 @@ fun UserDetailsScreen(
         ) {
             IconButton(
                 onClick = {
+                    // Block back navigation while save/delete is in progress.
                     if (!isSaving && !isDeleting) onBack()
                 }
             ) {
@@ -219,6 +238,7 @@ fun UserDetailsScreen(
             }
         }
 
+        // Main scrollable content area for the user fields and actions.
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -226,12 +246,16 @@ fun UserDetailsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // These fields become editable only when isEditing = true.
             UserField("First name", firstName, { firstName = it }, !isEditing)
             UserField("Last name", lastName, { lastName = it }, !isEditing)
             UserField("Phone number", phoneNumber, { phoneNumber = it }, !isEditing)
             UserField("Email address", email, { email = it }, !isEditing)
             UserField("Username", username, { username = it }, !isEditing)
 
+            // Password is intentionally masked and always read-only here.
+            // This screen appears to be for viewing/editing profile details,
+            // not for changing credentials directly.
             UserField(
                 label = "Password",
                 value = "•".repeat(user.password.length.coerceAtLeast(6)),
@@ -239,6 +263,7 @@ fun UserDetailsScreen(
                 readOnly = true
             )
 
+            // Surface delete errors from a higher layer (likely ViewModel/repository).
             if (!deleteErrorMessage.isNullOrBlank()) {
                 Text(
                     text = deleteErrorMessage,
@@ -255,6 +280,8 @@ fun UserDetailsScreen(
                     if (isSaving || isDeleting) return@Button
 
                     if (isEditing) {
+                        // Create an updated copy of the existing user with trimmed input.
+                        // Trimming helps avoid accidental spaces from user input.
                         val updatedUser = user.copy(
                             firstName = firstName.trim(),
                             lastName = lastName.trim(),
@@ -263,12 +290,18 @@ fun UserDetailsScreen(
                             username = username.trim()
                         )
 
+                        // Note:
+                        // isSaving is toggled on and off immediately here, which means
+                        // this currently behaves like a synchronous save from the UI's
+                        // point of view. If onSaveUser later becomes asynchronous, this
+                        // logic may need to be driven by external state instead.
                         isSaving = true
                         onSaveUser(updatedUser)
                         isEditing = false
                         isSaving = false
                         showSuccessDialog = true
                     } else {
+                        // First click switches the screen into edit mode.
                         isEditing = true
                     }
                 },
@@ -277,6 +310,7 @@ fun UserDetailsScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
+                    // Blue when entering edit mode, green when confirming save.
                     containerColor = if (isEditing) Color(0xFF6FBF73) else Color(0xFF7FA8D6),
                     contentColor = Color.Black
                 )
@@ -315,6 +349,8 @@ fun UserDetailsScreen(
             }
         }
 
+        // Local bottom navigation row for this screen.
+        // This is custom-built here instead of using a shared bottom nav component.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -338,6 +374,9 @@ private fun UserField(
     onValueChange: (String) -> Unit,
     readOnly: Boolean
 ) {
+    // Shared field styling for all user info rows.
+    // Editable fields get a light blue background so the user can clearly see
+    // when the screen is in edit mode.
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -367,6 +406,7 @@ private fun BottomItem(
     color: Color,
     onClick: () -> Unit
 ) {
+    // Small reusable bottom-nav item made of an icon + label.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable { onClick() }

@@ -23,6 +23,8 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TasksIntegrationTest {
 
+    // Test dispatcher lets us fully control coroutine timing in tests.
+    // That makes async ViewModel code predictable and easy to verify.
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var repository: DemoTasksRepository
@@ -30,19 +32,24 @@ class TasksIntegrationTest {
 
     @Before
     fun setup() {
+        // Redirect Main dispatcher usage to our test dispatcher.
         Dispatchers.setMain(testDispatcher)
 
+        // Use the demo repository so the test works with predictable fake/demo data
+        // instead of depending on real backend infrastructure.
         repository = DemoTasksRepository()
         viewModel = TasksViewModel(repository)
     }
 
     @After
     fun tearDown() {
+        // Restore Main dispatcher after each test to keep test isolation clean.
         Dispatchers.resetMain()
     }
 
     @Test
     fun addTask_shouldAppearInViewModelList() = runTest {
+        // Let init/startTasksListener finish before starting assertions.
         advanceUntilIdle()
 
         val newTask = TaskData(
@@ -55,9 +62,11 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
+        // Act: add a new task through the ViewModel.
         viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
+        // Assert: the task should now exist in the observable ViewModel list.
         val exists = viewModel.tasks.any {
             it.taskDetails == "Integration Test Task"
         }
@@ -67,6 +76,7 @@ class TasksIntegrationTest {
 
     @Test
     fun deleteTask_shouldRemoveTaskFromViewModelList() = runTest {
+        // Allow initial loading/listening to complete first.
         advanceUntilIdle()
 
         val newTask = TaskData(
@@ -79,6 +89,7 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
+        // Arrange: create a task we can delete.
         viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
@@ -88,9 +99,11 @@ class TasksIntegrationTest {
 
         assertTrue(addedTask != null)
 
+        // Act: delete the task by id.
         viewModel.deleteTask(addedTask!!.id)
         advanceUntilIdle()
 
+        // Assert: it should no longer be present in the ViewModel state.
         val stillExists = viewModel.tasks.any {
             it.id == addedTask.id
         }
@@ -100,6 +113,7 @@ class TasksIntegrationTest {
 
     @Test
     fun updateStatus_shouldChangeTaskStatusInViewModelList() = runTest {
+        // Allow initial repository listener/setup to settle.
         advanceUntilIdle()
 
         val newTask = TaskData(
@@ -112,6 +126,7 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
+        // Arrange: add a task with a known starting status.
         viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
@@ -122,9 +137,11 @@ class TasksIntegrationTest {
         assertTrue(addedTask != null)
         assertEquals(TaskStatus.PENDING, addedTask!!.status)
 
+        // Act: change the task status.
         viewModel.updateStatus(addedTask.id, TaskStatus.COMPLETED)
         advanceUntilIdle()
 
+        // Assert: the same task should now reflect the new status.
         val updatedTask = viewModel.tasks.firstOrNull {
             it.id == addedTask.id
         }
@@ -135,6 +152,7 @@ class TasksIntegrationTest {
 
     @Test
     fun updateTask_shouldChangeTaskFieldsInViewModelList() = runTest {
+        // Let the initial task listener finish first.
         advanceUntilIdle()
 
         val newTask = TaskData(
@@ -147,6 +165,7 @@ class TasksIntegrationTest {
             status = TaskStatus.PENDING
         )
 
+        // Arrange: add the original version of the task.
         viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
@@ -156,15 +175,18 @@ class TasksIntegrationTest {
 
         assertTrue(addedTask != null)
 
+        // Build an updated copy with a few changed fields.
         val updatedTaskData = addedTask!!.copy(
             customer = "Updated Customer",
             address = "Updated Address",
             taskDetails = "Updated Details"
         )
 
+        // Act: save the updated task.
         viewModel.updateTask(updatedTaskData)
         advanceUntilIdle()
 
+        // Assert: verify the list now reflects the updated values.
         val updatedTask = viewModel.tasks.firstOrNull {
             it.id == addedTask.id
         }
@@ -177,21 +199,36 @@ class TasksIntegrationTest {
 
     @Test
     fun init_whenRepositoryFails_shouldSetErrorMessage() = runTest {
+        // Use a purposely failing repository to verify the ViewModel's error handling
+        // during startup/listener registration.
         val failingRepository = FailingTasksRepository()
         val failingViewModel = TasksViewModel(failingRepository)
 
         advanceUntilIdle()
 
-        assertEquals("Failed to load tasks for test", failingViewModel.errorMessage.value)
+        // The ViewModel should expose the listener error, keep the list empty,
+        // and stop showing a loading state.
+        assertEquals("Failed to listen to tasks for test", failingViewModel.errorMessage.value)
         assertTrue(failingViewModel.tasks.isEmpty())
         assertFalse(failingViewModel.isLoading.value)
     }
 
+    // Minimal fake repository that fails on purpose.
+    // This is useful for testing the unhappy path without needing mocking libraries.
     private class FailingTasksRepository : TasksRepository {
 
         override suspend fun getTasks(): List<TaskData> {
             throw Exception("Failed to load tasks for test")
         }
+
+        override fun startTasksListener(
+            onTasksChanged: (List<TaskData>) -> Unit,
+            onError: (String) -> Unit
+        ) {
+            onError("Failed to listen to tasks for test")
+        }
+
+        override fun stopTasksListener() {}
 
         override suspend fun addTask(
             newTask: TaskData,

@@ -54,11 +54,33 @@ import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
 import kotlinx.coroutines.delay
 
+/**
+ * Small internal model used to describe which profile fields should be shown.
+ *
+ * Instead of hardcoding every visible field directly in the LazyColumn,
+ * we build a small list of field descriptors and render them in one place.
+ * That keeps the UI easier to maintain and makes role-based visibility simpler.
+ */
 private data class ProfileFieldItem(
     val key: String,
     val label: String
 )
 
+/**
+ * Profile screen for viewing/updating user information and changing password.
+ *
+ * Responsibilities:
+ * - show editable general profile information
+ * - allow toggling individual fields into edit mode
+ * - allow password changes
+ * - show temporary success/error messages
+ * - provide logout action
+ * - keep bottom navigation visible
+ *
+ * There is also a role-based behavior here:
+ * - admins can edit more general fields
+ * - non-admin users get a more limited set
+ */
 @Composable
 fun ProfileScreen(
     email: String,
@@ -81,27 +103,59 @@ fun ProfileScreen(
 ) {
     val isAdmin = role.equals("admin", ignoreCase = true)
 
+    /**
+     * Editable field state.
+     *
+     * These local states are initialized from the incoming values and updated
+     * again whenever the source values change from above.
+     */
     var editableFirstName by remember(firstName) { mutableStateOf(firstName) }
     var editableLastName by remember(lastName) { mutableStateOf(lastName) }
     var editableUsername by remember(username) { mutableStateOf(username) }
     var editableEmail by remember(email) { mutableStateOf(email) }
     var editablePhoneNumber by remember(phoneNumber) { mutableStateOf(phoneNumber) }
 
+    /**
+     * Tracks which general fields are currently in edit mode.
+     *
+     * We use a list of keys instead of separate booleans for each field,
+     * which scales much better as fields are added or removed.
+     */
     val editingFields = remember { mutableStateListOf<String>() }
 
+    /**
+     * Password form state.
+     */
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
 
+    /**
+     * Password visibility toggles for the three password inputs.
+     */
     var currentPasswordVisible by remember { mutableStateOf(false) }
     var newPasswordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
+    /**
+     * Temporary security/password status message state.
+     *
+     * This is shown inside the security card and automatically cleared later.
+     */
     var visibleStatusMessage by remember { mutableStateOf<String?>(null) }
     var isSuccessStatus by remember { mutableStateOf(false) }
 
+    /**
+     * Temporary general profile save status message.
+     */
     var profileStatusMessage by remember { mutableStateOf<String?>(null) }
 
+    /**
+     * Build the list of general profile fields dynamically.
+     *
+     * Admins can edit more fields, while non-admins have a smaller set.
+     * This keeps the UI role-aware without duplicating large chunks of code.
+     */
     val generalFields = buildList {
         if (isAdmin) add(ProfileFieldItem("firstName", "First name"))
         if (isAdmin) add(ProfileFieldItem("lastName", "Last name"))
@@ -110,6 +164,13 @@ fun ProfileScreen(
         if (isAdmin) add(ProfileFieldItem("phoneNumber", "Phone number"))
     }
 
+    /**
+     * If the profile data coming from above changes, refresh the local editable
+     * state so the screen stays in sync with the true source of truth.
+     *
+     * We also clear edit mode because the incoming data may now represent a
+     * freshly saved or newly loaded profile state.
+     */
     LaunchedEffect(firstName, lastName, username, email, phoneNumber) {
         editableFirstName = firstName
         editableLastName = lastName
@@ -119,17 +180,35 @@ fun ProfileScreen(
         editingFields.clear()
     }
 
+    /**
+     * React to password success/error messages from above.
+     *
+     * Success behavior:
+     * - show success message
+     * - clear all password inputs
+     * - reset password visibility toggles
+     * - hide message after a short delay
+     *
+     * Error behavior:
+     * - show error message
+     * - leave the inputs as-is so the user can correct them
+     * - hide message after a short delay
+     */
     LaunchedEffect(passwordSuccessMessage, passwordErrorMessage) {
         when {
             !passwordSuccessMessage.isNullOrBlank() -> {
                 visibleStatusMessage = passwordSuccessMessage
                 isSuccessStatus = true
+
+                // Clear sensitive input after a successful password change.
                 currentPassword = ""
                 newPassword = ""
                 confirmPassword = ""
+
                 currentPasswordVisible = false
                 newPasswordVisible = false
                 confirmPasswordVisible = false
+
                 delay(3500)
                 onClearPasswordMessages()
                 visibleStatusMessage = null
@@ -138,6 +217,7 @@ fun ProfileScreen(
             !passwordErrorMessage.isNullOrBlank() -> {
                 visibleStatusMessage = passwordErrorMessage
                 isSuccessStatus = false
+
                 delay(3500)
                 onClearPasswordMessages()
                 visibleStatusMessage = null
@@ -149,6 +229,9 @@ fun ProfileScreen(
         }
     }
 
+    /**
+     * Auto-hide the profile save success message after a short delay.
+     */
     LaunchedEffect(profileStatusMessage) {
         if (!profileStatusMessage.isNullOrBlank()) {
             delay(2500)
@@ -162,6 +245,9 @@ fun ProfileScreen(
             .background(Color(0xFFF3F3F3))
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        /**
+         * Custom header area.
+         */
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -194,6 +280,12 @@ fun ProfileScreen(
             }
         }
 
+        /**
+         * Main scrollable content area.
+         *
+         * Using LazyColumn keeps the layout flexible and scalable as more
+         * settings/sections are added later.
+         */
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -215,6 +307,9 @@ fun ProfileScreen(
                 )
             }
 
+            /**
+             * Render all general profile fields from the dynamic field list.
+             */
             items(generalFields, key = { it.key }) { field ->
                 when (field.key) {
                     "firstName" -> EditableProfileField(
@@ -268,6 +363,12 @@ fun ProfileScreen(
                 }
             }
 
+            /**
+             * Save profile button.
+             *
+             * We trim values before sending them upward so the parent layer gets
+             * cleaner, normalized input.
+             */
             item {
                 Button(
                     onClick = {
@@ -278,6 +379,8 @@ fun ProfileScreen(
                             editableEmail.trim(),
                             editablePhoneNumber.trim()
                         )
+
+                        // Once save is triggered, leave edit mode.
                         editingFields.clear()
                         profileStatusMessage = "Profile updated successfully."
                     },
@@ -307,6 +410,9 @@ fun ProfileScreen(
                 )
             }
 
+            /**
+             * Password change section.
+             */
             item {
                 SecurityCard {
                     PasswordInputField(
@@ -380,6 +486,12 @@ fun ProfileScreen(
                 }
             }
 
+            /**
+             * Logout action at the bottom.
+             *
+             * Styled as a destructive/red action to visually communicate that it
+             * ends the current session.
+             */
             item {
                 Row(
                     modifier = Modifier
@@ -411,6 +523,12 @@ fun ProfileScreen(
     }
 }
 
+/**
+ * Toggles whether a given general profile field is currently editable.
+ *
+ * If the field key is already in the list, remove it.
+ * Otherwise, add it.
+ */
 private fun toggleEditField(
     editingFields: MutableList<String>,
     key: String
@@ -422,6 +540,12 @@ private fun toggleEditField(
     }
 }
 
+/**
+ * Reusable editable text field for profile information.
+ *
+ * This field is read-only by default and becomes editable only when the user
+ * taps the trailing edit icon.
+ */
 @Composable
 private fun EditableProfileField(
     label: String,
@@ -441,6 +565,8 @@ private fun EditableProfileField(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "Edit $label",
+
+                    // Slightly stronger color when the field is actively editable.
                     tint = if (isEditing) Color(0xFF1D5FB8) else Color(0xFF8F99A7)
                 )
             }
@@ -468,6 +594,9 @@ private fun EditableProfileField(
     )
 }
 
+/**
+ * Small reusable card container for the security/password section.
+ */
 @Composable
 private fun SecurityCard(
     content: @Composable ColumnScope.() -> Unit
@@ -482,6 +611,14 @@ private fun SecurityCard(
     )
 }
 
+/**
+ * Password input field with a visibility toggle.
+ *
+ * Used for:
+ * - current password
+ * - new password
+ * - confirm new password
+ */
 @Composable
 private fun PasswordInputField(
     label: String,
@@ -533,6 +670,12 @@ private fun PasswordInputField(
     )
 }
 
+/**
+ * Reusable status message box.
+ *
+ * Even though the name mentions "Password", it is also reused for the general
+ * profile success message because the visual style works well for both cases.
+ */
 @Composable
 private fun PasswordStatusBox(
     message: String,

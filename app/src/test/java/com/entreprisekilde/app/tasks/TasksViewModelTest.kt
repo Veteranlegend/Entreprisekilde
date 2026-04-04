@@ -22,20 +22,26 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TasksViewModelTest {
 
+    // Test dispatcher used to control coroutine timing in a predictable way.
+    // This helps make ViewModel tests deterministic instead of flaky.
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
+        // Redirect Dispatchers.Main to the test dispatcher before each test.
         Dispatchers.setMain(testDispatcher)
     }
 
     @After
     fun tearDown() {
+        // Always restore the real main dispatcher after the test finishes.
         Dispatchers.resetMain()
     }
 
     @Test
     fun init_loadsTasksIntoState() = runTest {
+        // Demo repository already contains seeded task data,
+        // so ViewModel init should load something into state.
         val repository = DemoTasksRepository()
 
         val viewModel = TasksViewModel(repository)
@@ -62,6 +68,8 @@ class TasksViewModelTest {
             taskDetails = "Created from ViewModel test"
         )
 
+        // Add a new task through the ViewModel and verify
+        // that the local observable state reflects the change.
         viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
@@ -85,6 +93,7 @@ class TasksViewModelTest {
             taskDetails = "Task to delete"
         )
 
+        // First add a known task so the test controls exactly what gets deleted.
         viewModel.addTask(taskToDelete, emptyList())
         advanceUntilIdle()
 
@@ -93,6 +102,8 @@ class TasksViewModelTest {
         viewModel.deleteTask("vm-delete-task")
         advanceUntilIdle()
 
+        // After deletion, the list should shrink by one
+        // and the task should no longer exist in state.
         assertEquals(sizeBeforeDelete - 1, viewModel.tasks.size)
         assertTrue(viewModel.tasks.none { it.id == "vm-delete-task" })
     }
@@ -113,6 +124,7 @@ class TasksViewModelTest {
             taskDetails = "Task for status update"
         )
 
+        // Insert a known task, then update its status through the ViewModel.
         viewModel.addTask(taskToUpdate, emptyList())
         advanceUntilIdle()
 
@@ -128,20 +140,34 @@ class TasksViewModelTest {
         val repository = DemoTasksRepository()
         val viewModel = TasksViewModel(repository)
 
+        // Selecting a task should update the selected index.
         viewModel.selectTask(2)
         assertEquals(2, viewModel.selectedTaskIndex.value)
 
+        // Clearing the selection should reset the index
+        // back to the ViewModel's "nothing selected" value.
         viewModel.clearSelectedTask()
         assertEquals(-1, viewModel.selectedTaskIndex.value)
     }
 
     @Test
     fun addTask_whenRepositoryFails_setsErrorMessage() = runTest {
+        // Fake repository that only fails for addTask so we can verify
+        // the ViewModel's error-handling path.
         val failingRepository = object : TasksRepository {
 
             override suspend fun getTasks(): List<TaskData> {
                 return emptyList()
             }
+
+            override fun startTasksListener(
+                onTasksChanged: (List<TaskData>) -> Unit,
+                onError: (String) -> Unit
+            ) {
+                onTasksChanged(emptyList())
+            }
+
+            override fun stopTasksListener() {}
 
             override suspend fun addTask(
                 newTask: TaskData,
@@ -181,6 +207,8 @@ class TasksViewModelTest {
         viewModel.addTask(newTask, emptyList())
         advanceUntilIdle()
 
+        // The ViewModel should expose the repository failure message
+        // so the UI can react or show feedback.
         assertEquals("Test error", viewModel.errorMessage.value)
     }
 }

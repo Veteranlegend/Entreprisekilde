@@ -3,12 +3,25 @@ const { setGlobalOptions } = require("firebase-functions/v2");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 
+// Initialize the Firebase Admin SDK once so Firestore and FCM can be used server-side.
 admin.initializeApp();
 
+// Limit how many function instances can run at the same time.
+// This helps avoid uncontrolled scaling for this small notification workload.
 setGlobalOptions({ maxInstances: 10 });
 
 const db = admin.firestore();
 
+/**
+ * Collects all valid FCM tokens stored on a user document.
+ *
+ * We support both:
+ * - a legacy single-token field: fcmToken
+ * - a newer multi-token field: fcmTokens
+ *
+ * The final result is deduplicated so we do not send the same push more than once
+ * to the same physical token.
+ */
 function getAllValidTokens(userDoc) {
   const tokens = [];
 
@@ -29,6 +42,12 @@ function getAllValidTokens(userDoc) {
   return [...new Set(tokens)];
 }
 
+/**
+ * Rewrites the user's stored token fields with only the tokens we still consider valid.
+ *
+ * This is useful after sending a multicast push, because Firebase can tell us which
+ * tokens worked and which ones failed. That lets us automatically clean up stale tokens.
+ */
 async function cleanupUserTokens(userId, validTokensToKeep = []) {
   if (!userId) return;
 
@@ -36,14 +55,25 @@ async function cleanupUserTokens(userId, validTokensToKeep = []) {
 
   await db.collection("users").doc(userId).set(
     {
+      // Keep the first valid token in the legacy single-token field for backward compatibility.
       fcmToken: cleanedTokens[0] || "",
+
+      // Store the full cleaned token list in the newer array-based field.
       fcmTokens: cleanedTokens,
+
+      // Useful for debugging and tracking when token state was last refreshed.
       lastTokenUpdatedAt: Date.now(),
     },
     { merge: true }
   );
 }
 
+/**
+ * Creates an in-app notification record in Firestore.
+ *
+ * This powers the notifications screen inside the app, independent of whether
+ * the push notification was successfully delivered to the device.
+ */
 async function createInAppNotification({
   userId,
   title,
@@ -64,6 +94,18 @@ async function createInAppNotification({
   });
 }
 
+/**
+ * Sends a push notification to all valid tokens for a given user.
+ *
+ * The function:
+ * - loads the user's tokens
+ * - sends one multicast request
+ * - logs successes/failures
+ * - removes tokens that failed
+ *
+ * We send both a "notification" payload and a "data" payload so the app can
+ * both display the push and react to it programmatically when needed.
+ */
 async function sendNotificationToUser(userId, title, body, data = {}) {
   if (!userId) return;
 
@@ -85,6 +127,8 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
   try {
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
+
+      // FCM data values must be strings, so we normalize everything before sending.
       data: Object.fromEntries(
         Object.entries({
           title,
@@ -92,13 +136,18 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
           ...data,
         }).map(([key, value]) => [key, String(value)])
       ),
+
+      // Standard visible notification payload.
       notification: {
         title,
         body,
       },
+
+      // Android-specific settings.
       android: {
         priority: "high",
         notification: {
+          // This should match a notification channel created in the Android app.
           channelId: "entreprisekilde_urgent_v2",
         },
       },
@@ -110,9 +159,11 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
       failureCount: response.failureCount,
     });
 
+    // Keep only tokens that succeeded so we can clean out invalid/stale ones.
     const validTokens = [];
     response.responses.forEach((result, index) => {
       const token = tokens[index];
+
       if (result.success) {
         validTokens.push(token);
         return;
@@ -137,6 +188,16 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
   }
 }
 
+/**
+ * Triggered whenever a new message is created inside a message thread.
+ *
+ * Flow:
+ * 1. Read the new message
+ * 2. Load the thread to figure out participants
+ * 3. Determine who the recipient should be
+ * 4. Create an in-app notification
+ * 5. Send a push notification to the recipient
+ */
 exports.sendMessageNotification = onDocumentCreated(
   "messageThreads/{threadId}/messages/{messageId}",
   async (event) => {
@@ -146,6 +207,7 @@ exports.sendMessageNotification = onDocumentCreated(
     const message = messageSnap.data();
     const threadId = event.params.threadId;
 
+    // Load the parent thread so we can resolve participants and display names.
     const threadSnap = await db.collection("messageThreads").doc(threadId).get();
     if (!threadSnap.exists) {
       logger.warn(`Thread ${threadId} not found`);
@@ -153,7 +215,11 @@ exports.sendMessageNotification = onDocumentCreated(
     }
 
     const thread = threadSnap.data() || {};
+
+    // participantIds is expected to be an array of user ids in the conversation.
     const participantIds = Array.isArray(thread.participantIds) ? thread.participantIds : [];
+
+    // participantNames is expected to be a map like { userId: "Display Name" }.
     const participantNames =
       thread.participantNames && typeof thread.participantNames === "object"
         ? thread.participantNames
@@ -171,7 +237,11 @@ exports.sendMessageNotification = onDocumentCreated(
       return;
     }
 
+    // Prefer an explicitly stored recipient if present.
     let recipientId = explicitRecipientId;
+
+    // If no explicit recipient was saved, try to infer it from the thread participants.
+    // This works best for one-to-one chats.
     if (!recipientId) {
       const otherParticipants = participantIds.filter(
         (id) => typeof id === "string" && id.trim() !== "" && id.trim() !== senderId
@@ -187,11 +257,13 @@ exports.sendMessageNotification = onDocumentCreated(
       return;
     }
 
+    // Use the sender's display name if available, otherwise fall back to a generic label.
     const senderName =
       typeof participantNames[senderId] === "string" && participantNames[senderId].trim() !== ""
         ? participantNames[senderId].trim()
         : "New message";
 
+    // Give image messages a friendlier preview in both push and in-app notifications.
     const body = messageType === "image"
       ? "📷 Sent you an image"
       : (text || "You received a new message");
@@ -201,6 +273,8 @@ exports.sendMessageNotification = onDocumentCreated(
       title: "New message",
       message: `${senderName}: ${body}`,
       type: "MESSAGE",
+
+      // Stored as Number here because the app appears to expect a numeric related thread id.
       relatedThreadId: Number(threadId),
     });
 
@@ -218,6 +292,13 @@ exports.sendMessageNotification = onDocumentCreated(
   }
 );
 
+/**
+ * Triggered when a new task document is created.
+ *
+ * If the task has an assigned user, we create both:
+ * - an in-app notification
+ * - a push notification
+ */
 exports.sendTaskAssignedNotificationOnCreate = onDocumentCreated(
   "tasks/{taskId}",
   async (event) => {
@@ -235,6 +316,7 @@ exports.sendTaskAssignedNotificationOnCreate = onDocumentCreated(
       return;
     }
 
+    // Build a user-friendly notification message using whatever task data is available.
     const customer =
       typeof task.customer === "string" && task.customer.trim() !== ""
         ? task.customer.trim()
@@ -269,6 +351,12 @@ exports.sendTaskAssignedNotificationOnCreate = onDocumentCreated(
   }
 );
 
+/**
+ * Triggered whenever a task document is updated.
+ *
+ * We only send a notification when the assigned user changes.
+ * That prevents unnecessary pushes on unrelated task edits.
+ */
 exports.sendTaskAssignedNotificationOnUpdate = onDocumentUpdated(
   "tasks/{taskId}",
   async (event) => {
@@ -281,6 +369,7 @@ exports.sendTaskAssignedNotificationOnUpdate = onDocumentUpdated(
     const afterAssigned =
       typeof after.assignedUserId === "string" ? after.assignedUserId.trim() : "";
 
+    // Skip when there is no assignee or the assignee did not actually change.
     if (!afterAssigned || beforeAssigned === afterAssigned) {
       return;
     }

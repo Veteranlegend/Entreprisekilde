@@ -1,4 +1,5 @@
-package com.entreprisekilde.app.ui.admin.viewmodel
+package com.entreprisekilde.app.ui.admin.users
+
 import com.entreprisekilde.app.data.model.users.User
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -60,8 +61,12 @@ fun EmployeeScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // Holds the current text entered into the search field.
+    // This is used to filter the visible user list in real time.
     var searchText by remember { mutableStateOf("") }
 
+    // Simple local filtering across the most useful user-identifying fields.
+    // This makes it easier for admins to find a user by name, email, phone, or username.
     val filteredUsers = users.filter {
         it.fullName.contains(searchText, ignoreCase = true) ||
                 it.email.contains(searchText, ignoreCase = true) ||
@@ -75,6 +80,7 @@ fun EmployeeScreen(
             .background(Color(0xFFF7F7F7))
             .statusBarsPadding()
     ) {
+        // Top header bar for screen title and back navigation.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -104,6 +110,7 @@ fun EmployeeScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Decorative icon that gives the screen a stronger "user management" identity.
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -125,6 +132,7 @@ fun EmployeeScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
+            // Search field used to narrow down the user list as the admin types.
             OutlinedTextField(
                 value = searchText,
                 onValueChange = { searchText = it },
@@ -159,6 +167,8 @@ fun EmployeeScreen(
 
             Spacer(modifier = Modifier.padding(vertical = 8.dp))
 
+            // Main user list.
+            // Each row is clickable and routes to a user-specific details flow.
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -172,6 +182,7 @@ fun EmployeeScreen(
                 }
             }
 
+            // Primary action for creating a new user from the admin area.
             Button(
                 onClick = onCreateUserClick,
                 modifier = Modifier
@@ -192,6 +203,7 @@ fun EmployeeScreen(
             }
         }
 
+        // Bottom navigation for moving between the main sections of the app.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -234,6 +246,8 @@ private fun UserCard(
     user: User,
     onClick: () -> Unit
 ) {
+    // Compact user row card used inside the list.
+    // Keeps the layout intentionally simple so scanning many users feels easy.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -247,6 +261,8 @@ private fun UserCard(
             .padding(horizontal = 14.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Soft avatar-style icon area.
+        // This is currently static, but visually gives each row a stronger entry point.
         Box(
             modifier = Modifier
                 .size(54.dp)
@@ -271,6 +287,7 @@ private fun UserCard(
             modifier = Modifier.weight(1f)
         )
 
+        // Chevron-like character to hint that the row opens a details screen.
         Text(
             text = "›",
             fontSize = 28.sp,
@@ -286,6 +303,7 @@ private fun EmployeeBottomNavItem(
     color: Color,
     onClick: () -> Unit = {}
 ) {
+    // Small reusable bottom-nav item used for this screen's footer navigation.
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable { onClick() }

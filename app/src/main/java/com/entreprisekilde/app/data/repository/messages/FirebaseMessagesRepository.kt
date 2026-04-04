@@ -18,12 +18,40 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+/**
+ * Firebase implementation of [MessagesRepository].
+ *
+ * This repository is responsible for:
+ * - loading threads for a specific user
+ * - loading messages inside a thread
+ * - listening for real-time updates from Firestore
+ * - sending text and image messages
+ * - managing unread counts, typing state, and soft delete behavior
+ *
+ * Firestore structure used here:
+ * - messageThreads/{threadId}
+ * - messageThreads/{threadId}/messages/{messageId}
+ */
 class FirebaseMessagesRepository : MessagesRepository {
 
+    // Main Firestore database instance
     private val firestore = FirebaseFirestore.getInstance()
+
+    // Firebase Storage instance used for uploading chat images
     private val storage = FirebaseStorage.getInstance()
+
+    // Top-level collection containing all chat threads
     private val threadsCollection = firestore.collection("messageThreads")
 
+    /**
+     * Loads all threads that the given user participates in.
+     *
+     * We only return threads where:
+     * - the user is included in participantIds
+     * - the thread is not soft-deleted for that user
+     *
+     * The result is sorted so the newest active thread appears first.
+     */
     override suspend fun getThreadsForUser(userId: String): List<MessageThread> {
         return try {
             val snapshot = threadsCollection
@@ -42,6 +70,17 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Starts a real-time Firestore listener for the user's chat threads.
+     *
+     * This is used so the UI updates automatically when:
+     * - a new message arrives
+     * - unread counts change
+     * - thread order changes
+     * - typing/deletion state changes
+     *
+     * Returns a function that removes the listener when no longer needed.
+     */
     override fun startThreadsListener(
         userId: String,
         onUpdate: (List<MessageThread>) -> Unit,
@@ -71,6 +110,12 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Loads all messages inside a specific thread.
+     *
+     * Messages are sorted oldest -> newest so the UI can display them
+     * in the correct conversation order.
+     */
     override suspend fun getMessages(threadId: Int): List<ChatMessage> {
         return try {
             val snapshot = threadsCollection
@@ -88,6 +133,14 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Starts a real-time listener for messages inside one thread.
+     *
+     * This allows the chat screen to update immediately when:
+     * - a new message is sent
+     * - read status changes
+     * - image messages are uploaded
+     */
     override fun startMessagesListener(
         threadId: Int,
         onUpdate: (List<ChatMessage>) -> Unit,
@@ -115,6 +168,13 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Marks the thread as read for one specific user.
+     *
+     * Important:
+     * This only resets the thread-level unread count in unreadCountByUser.
+     * Individual message read receipts are handled separately in markMessagesAsRead().
+     */
     override suspend fun markThreadAsRead(
         threadId: Int,
         userId: String
@@ -128,12 +188,22 @@ class FirebaseMessagesRepository : MessagesRepository {
             it.key.toString() to ((it.value as? Number)?.toInt() ?: 0)
         }.toMutableMap()
 
+        // No need to write to Firestore if unread is already zero
         if ((unreadMap[userId] ?: 0) == 0) return
 
         unreadMap[userId] = 0
         threadRef.update("unreadCountByUser", unreadMap).await()
     }
 
+    /**
+     * Marks all unread incoming messages in the thread as read for this user.
+     *
+     * Rules:
+     * - we never mark the user's own messages as read
+     * - we only update messages where the user is not already in readByUserIds
+     *
+     * A batch write is used so multiple message updates happen efficiently.
+     */
     override suspend fun markMessagesAsRead(
         threadId: Int,
         userId: String
@@ -164,6 +234,15 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Updates the typing state for a user in a thread.
+     *
+     * The user's ID is either:
+     * - added to typingUserIds when typing starts
+     * - removed when typing stops
+     *
+     * This powers real-time "typing..." indicators in the UI.
+     */
     override suspend fun setTypingState(
         threadId: Int,
         userId: String,
@@ -178,6 +257,13 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Soft-deletes the thread for the current user.
+     *
+     * The thread is not removed from Firestore.
+     * Instead, the current user's ID is added to deletedForUserIds so the thread
+     * becomes hidden only for that user.
+     */
     override suspend fun deleteThread(
         threadId: Int,
         currentUserId: String
@@ -189,6 +275,18 @@ class FirebaseMessagesRepository : MessagesRepository {
         ).await()
     }
 
+    /**
+     * Sends a text message in a thread.
+     *
+     * Flow:
+     * 1. Validate and trim the text
+     * 2. Load thread metadata
+     * 3. Recalculate unread counts
+     * 4. Create message document
+     * 5. Update thread preview fields
+     *
+     * We also remove the sender from typingUserIds after sending.
+     */
     override suspend fun sendMessage(
         threadId: Int,
         senderId: String,
@@ -209,6 +307,7 @@ class FirebaseMessagesRepository : MessagesRepository {
             it.key.toString() to it.value.toString()
         }
 
+        // In 1-to-1 chat, recipient is the participant who is not the sender
         val recipientId = participantIds.firstOrNull { it != senderId }.orEmpty()
         val senderName = participantNames[senderId].orEmpty()
 
@@ -217,6 +316,8 @@ class FirebaseMessagesRepository : MessagesRepository {
             it.key.toString() to ((it.value as? Number)?.toInt() ?: 0)
         }.toMutableMap()
 
+        // Sender should have 0 unread in this thread.
+        // Every other participant gets +1 unread.
         participantIds.forEach { participantId ->
             unreadMap[participantId] = if (participantId == senderId) 0 else (unreadMap[participantId] ?: 0) + 1
         }
@@ -235,8 +336,10 @@ class FirebaseMessagesRepository : MessagesRepository {
             "readByUserIds" to listOf(senderId)
         )
 
+        // Store the message as a new document under the thread
         threadRef.collection("messages").add(messageData).await()
 
+        // Update thread preview + metadata after the message is sent
         threadRef.update(
             mapOf(
                 "lastMessage" to trimmedText,
@@ -249,6 +352,16 @@ class FirebaseMessagesRepository : MessagesRepository {
         ).await()
     }
 
+    /**
+     * Sends an image message in a thread.
+     *
+     * Flow:
+     * 1. Load thread metadata
+     * 2. Upload image to Firebase Storage
+     * 3. Get public download URL
+     * 4. Save image message in Firestore
+     * 5. Update thread preview and unread counts
+     */
     override suspend fun sendImageMessage(
         threadId: Int,
         senderId: String,
@@ -280,6 +393,7 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         val nowMillis = System.currentTimeMillis()
 
+        // Store image under a per-thread folder to keep chat uploads organized
         val imageRef = storage.reference
             .child("chat_images")
             .child(threadId.toString())
@@ -310,6 +424,7 @@ class FirebaseMessagesRepository : MessagesRepository {
 
         threadRef.collection("messages").add(messageData).await()
 
+        // For image messages, thread preview shows a placeholder instead of the URL
         threadRef.update(
             mapOf(
                 "lastMessage" to "📷 Image",
@@ -322,6 +437,14 @@ class FirebaseMessagesRepository : MessagesRepository {
         ).await()
     }
 
+    /**
+     * Finds one thread by ID for a specific user.
+     *
+     * Returns null if:
+     * - the thread does not exist
+     * - the thread cannot be mapped
+     * - the thread is soft-deleted for this user
+     */
     override suspend fun findThreadById(
         threadId: Int,
         currentUserId: String
@@ -337,6 +460,13 @@ class FirebaseMessagesRepository : MessagesRepository {
         }
     }
 
+    /**
+     * Returns an existing 1-to-1 thread between the two users if it already exists.
+     * Otherwise, creates a brand new thread.
+     *
+     * If an existing thread was previously soft-deleted by the current user,
+     * it is restored by removing that user from deletedForUserIds.
+     */
     override suspend fun createOrGetThread(
         currentUserId: String,
         currentUserName: String,
@@ -373,6 +503,7 @@ class FirebaseMessagesRepository : MessagesRepository {
             ) ?: throw IllegalStateException("Failed to map existing thread.")
         }
 
+        // Thread IDs are stored as numeric strings, so we generate the next available one
         val allThreadsSnapshot = threadsCollection.get().await()
         val nextId = (allThreadsSnapshot.documents.mapNotNull { it.id.toIntOrNull() }.maxOrNull() ?: 0) + 1
         val nowMillis = System.currentTimeMillis()
@@ -418,6 +549,12 @@ class FirebaseMessagesRepository : MessagesRepository {
         )
     }
 
+    /**
+     * Maps a Firestore message document into the app's ChatMessage model.
+     *
+     * This keeps Firestore parsing logic in one place and makes the rest
+     * of the repository cleaner.
+     */
     private fun mapChatMessageDocument(
         docId: String,
         threadId: Int,
@@ -438,6 +575,12 @@ class FirebaseMessagesRepository : MessagesRepository {
         )
     }
 
+    /**
+     * Maps a Firestore thread document into the app's MessageThread model.
+     *
+     * This method also calculates the correct recipient for the current user
+     * and extracts the user-specific unread count.
+     */
     private fun mapThreadDocument(
         docId: String,
         data: Map<String, Any>?,
@@ -479,6 +622,12 @@ class FirebaseMessagesRepository : MessagesRepository {
         )
     }
 
+    /**
+     * Formats a timestamp into a simple UI-friendly HH:mm value.
+     *
+     * Example:
+     * 09:41
+     */
     private fun currentTime(nowMillis: Long): String {
         val localDateTime = LocalDateTime.ofInstant(
             Instant.ofEpochMilli(nowMillis),

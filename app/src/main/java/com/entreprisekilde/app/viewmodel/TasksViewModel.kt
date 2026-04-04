@@ -21,7 +21,7 @@ class TasksViewModel(
     val errorMessage = mutableStateOf<String?>(null)
 
     init {
-        loadTasks()
+        startTasksListener()
     }
 
     fun selectTask(index: Int) {
@@ -50,7 +50,6 @@ class TasksViewModel(
 
             try {
                 tasksRepository.addTask(newTask, imageUris)
-                refreshTasks()
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to add task."
             } finally {
@@ -79,8 +78,6 @@ class TasksViewModel(
                     uploadedByUserId = uploadedByUserId,
                     uploadedByName = uploadedByName
                 )
-
-                refreshTasks()
                 onDone(updatedTask)
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to add task images."
@@ -97,7 +94,6 @@ class TasksViewModel(
 
             try {
                 tasksRepository.deleteTask(taskId)
-                refreshTasks()
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to delete task."
             } finally {
@@ -113,7 +109,6 @@ class TasksViewModel(
 
             try {
                 tasksRepository.updateTask(updatedTask)
-                refreshTasks()
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to update task."
             } finally {
@@ -129,13 +124,30 @@ class TasksViewModel(
 
             try {
                 tasksRepository.updateStatus(taskId, newStatus)
-                refreshTasks()
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Failed to update status."
             } finally {
                 isLoading.value = false
             }
         }
+    }
+
+    private fun startTasksListener() {
+        isLoading.value = true
+        errorMessage.value = null
+
+        tasksRepository.startTasksListener(
+            onTasksChanged = { updatedTasks ->
+                tasks.clear()
+                tasks.addAll(updatedTasks)
+                errorMessage.value = null
+                isLoading.value = false
+            },
+            onError = { message ->
+                errorMessage.value = message
+                isLoading.value = false
+            }
+        )
     }
 
     private fun loadTasks() {
@@ -154,13 +166,8 @@ class TasksViewModel(
         }
     }
 
-    private suspend fun refreshTasks() {
-        try {
-            errorMessage.value = null
-            tasks.clear()
-            tasks.addAll(tasksRepository.getTasks())
-        } catch (e: Exception) {
-            errorMessage.value = e.message ?: "Failed to refresh tasks."
-        }
+    override fun onCleared() {
+        super.onCleared()
+        tasksRepository.stopTasksListener()
     }
 }

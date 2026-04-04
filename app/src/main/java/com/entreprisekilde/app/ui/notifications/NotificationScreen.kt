@@ -42,6 +42,19 @@ import com.entreprisekilde.app.data.model.notifications.NotificationType
 import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
 
+/**
+ * Main notifications screen.
+ *
+ * This screen is responsible for:
+ * - showing the current list of notifications
+ * - displaying unread status
+ * - letting the user mark everything as read
+ * - opening or deleting individual notifications
+ * - keeping the bottom navigation in sync with the rest of the app
+ *
+ * The actual business logic is intentionally passed in through callbacks,
+ * which keeps this composable focused on UI only.
+ */
 @Composable
 fun NotificationScreen(
     notifications: SnapshotStateList<AppNotification>,
@@ -56,10 +69,19 @@ fun NotificationScreen(
     onProfileClick: () -> Unit = {},
     onScreenClosed: () -> Unit = {}
 ) {
+    /**
+     * Notify the parent when this screen is opened or when the notification
+     * list changes size. That can be useful for refreshing state, analytics,
+     * or marking that the user has visited the screen.
+     */
     LaunchedEffect(notifications.size) {
         onScreenOpened()
     }
 
+    /**
+     * Runs cleanup logic when the composable leaves the composition.
+     * Useful for lifecycle-style tracking without putting that logic directly in the UI.
+     */
     DisposableEffect(Unit) {
         onDispose {
             onScreenClosed()
@@ -70,8 +92,15 @@ fun NotificationScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
+            // Applies safe area padding so content does not overlap status/system bars.
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        /**
+         * Header section for the screen.
+         *
+         * Uses a warm background color and a circular icon container to make
+         * the notifications page feel visually distinct from the main content area.
+         */
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -103,6 +132,12 @@ fun NotificationScreen(
             }
         }
 
+        /**
+         * Summary row shown only when there are notifications in the list.
+         *
+         * It gives the user quick feedback on unread items and shows a
+         * "mark all as read" action only when that action is actually relevant.
+         */
         if (notifications.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -134,6 +169,12 @@ fun NotificationScreen(
             }
         }
 
+        /**
+         * Empty state shown when there are no notifications yet.
+         *
+         * This is more user-friendly than leaving the screen blank and helps
+         * explain what kind of content will eventually appear here.
+         */
         if (notifications.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -175,6 +216,15 @@ fun NotificationScreen(
                 }
             }
         } else {
+            /**
+             * Main notifications list.
+             *
+             * LazyColumn is used here so the UI remains efficient even if the
+             * number of notifications grows over time.
+             *
+             * We use each notification's id as the key so Compose can keep
+             * item identity stable during recomposition.
+             */
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -191,6 +241,12 @@ fun NotificationScreen(
             }
         }
 
+        /**
+         * Bottom navigation stays visible at the bottom of the screen.
+         *
+         * Notifications is marked as the active destination, and we intentionally
+         * pass an empty lambda for onNotificationsClick because the user is already here.
+         */
         AppBottomNavBar(
             selectedItem = BottomNavDestination.NOTIFICATIONS,
             unreadNotificationCount = unreadCount,
@@ -202,6 +258,13 @@ fun NotificationScreen(
     }
 }
 
+/**
+ * Single notification row/card.
+ *
+ * This card changes its background color depending on whether the notification
+ * has been read. It also changes the leading icon and icon background color
+ * based on the notification type.
+ */
 @Composable
 private fun NotificationCard(
     notification: AppNotification,
@@ -212,6 +275,7 @@ private fun NotificationCard(
         modifier = Modifier
             .fillMaxWidth()
             .background(
+                // Unread notifications get a subtle blue tint so they stand out a bit more.
                 color = if (notification.isRead) Color.White else Color(0xFFEAF3FF),
                 shape = RoundedCornerShape(18.dp)
             )
@@ -223,6 +287,8 @@ private fun NotificationCard(
             modifier = Modifier
                 .size(46.dp)
                 .background(
+                    // Message and task-like notifications get different accent colors
+                    // so the user can quickly distinguish them visually.
                     color = if (notification.type == NotificationType.MESSAGE) {
                         Color(0xFFB7DDFC)
                     } else {
@@ -272,6 +338,12 @@ private fun NotificationCard(
             )
         }
 
+        /**
+         * Inline delete action.
+         *
+         * This gives the user a quick way to remove a notification without
+         * needing to open it first.
+         */
         Text(
             text = "Delete",
             color = Color(0xFFB06D6D),
@@ -282,8 +354,22 @@ private fun NotificationCard(
     }
 }
 
+/**
+ * Converts a timestamp into a short "time ago" label.
+ *
+ * Examples:
+ * - Just now
+ * - 5 min ago
+ * - 3 h ago
+ * - 2 d ago
+ * - 1 w ago
+ *
+ * The output is intentionally compact because it is used inside a small card layout.
+ */
 private fun formatTimeAgo(createdAt: Long): String {
     val now = System.currentTimeMillis()
+
+    // Guard against negative values in case createdAt is in the future for some reason.
     val diffMillis = (now - createdAt).coerceAtLeast(0L)
 
     val minute = 60_000L

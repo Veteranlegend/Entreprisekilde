@@ -9,8 +9,29 @@ import com.entreprisekilde.app.data.model.timesheet.TimesheetEntry
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+/**
+ * Central place for demo / seed data used across the app.
+ *
+ * This object helps populate the app with predictable sample content for:
+ * - tasks
+ * - message threads
+ * - chat messages
+ * - timesheet entries
+ *
+ * This is especially useful for:
+ * - local development
+ * - UI previews
+ * - demo builds
+ * - testing flows without needing real backend data
+ */
 object DemoSeedData {
 
+    /**
+     * Creates a fixed list of demo tasks.
+     *
+     * The data here is intentionally simple and readable so it is easy to reason
+     * about while developing task screens and task-related flows.
+     */
     fun createTasks(): List<TaskData> {
         return listOf(
             TaskData(
@@ -76,6 +97,20 @@ object DemoSeedData {
         )
     }
 
+    /**
+     * Creates demo message threads for the messaging feature.
+     *
+     * Each thread represents the conversation summary shown in an inbox list.
+     * It includes:
+     * - the recipient / other participant
+     * - the last message preview
+     * - unread counts
+     * - participant metadata
+     * - last sender information
+     *
+     * These IDs are matched by [createChatMessages], so thread 1 maps to the
+     * messages under key 1, thread 2 maps to key 2, and so on.
+     */
     fun createMessageThreads(): List<MessageThread> {
         return listOf(
             MessageThread(
@@ -153,6 +188,17 @@ object DemoSeedData {
         )
     }
 
+    /**
+     * Creates demo chat messages grouped by thread ID.
+     *
+     * The returned map uses the thread ID as the key:
+     * - key 1 -> messages for thread 1
+     * - key 2 -> messages for thread 2
+     * - etc.
+     *
+     * This makes it easy for a demo repository to fetch messages for a given
+     * thread without needing a real database.
+     */
     fun createChatMessages(): Map<Int, List<ChatMessage>> {
         return mapOf(
             1 to listOf(
@@ -163,6 +209,9 @@ object DemoSeedData {
                     text = "Can you work 2 hours extra today?",
                     time = "09:10",
                     createdAt = 1L,
+
+                    // Only the sender has read this so far, which helps simulate
+                    // unread behavior for the other participant.
                     readByUserIds = listOf("boss")
                 ),
                 ChatMessage(
@@ -212,6 +261,8 @@ object DemoSeedData {
                     text = "There is 1 extra shift available tomorrow.",
                     time = "07:30",
                     createdAt = 6L,
+
+                    // Both users have read this one, so this thread has no unread messages.
                     readByUserIds = listOf("shift_planner", "me")
                 )
             ),
@@ -238,6 +289,21 @@ object DemoSeedData {
         )
     }
 
+    /**
+     * Creates demo timesheet entries.
+     *
+     * We generate the dates relative to "today" so the timesheet screen always
+     * feels current, instead of being locked to old static dates.
+     *
+     * Example:
+     * - today
+     * - yesterday
+     * - two days ago
+     * - tomorrow
+     * - two days from now
+     *
+     * This is a small detail, but it makes the demo experience feel much more real.
+     */
     fun createTimesheetEntries(): List<TimesheetEntry> {
         val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
         val today = LocalDate.now()
@@ -279,6 +345,9 @@ object DemoSeedData {
                 fromTime = "09:30 AM",
                 toTime = "06:30 PM",
                 employeeName = "Rasmus Jensen",
+
+                // submittedHours = 0 is a useful way to represent a future shift
+                // that has been assigned but not yet worked/submitted.
                 submittedHours = 0,
                 assignedHours = 9,
                 approvalStatus = ShiftApprovalStatus.PENDING

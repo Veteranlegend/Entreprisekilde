@@ -18,21 +18,24 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class NotificationViewModelTest {
 
+    // Test dispatcher gives us full control over coroutine timing in unit tests.
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
+        // Replace Dispatchers.Main so ViewModel coroutines run on the test dispatcher.
         Dispatchers.setMain(testDispatcher)
     }
 
     @After
     fun tearDown() {
+        // Always restore the original Main dispatcher after each test.
         Dispatchers.resetMain()
     }
 
     @Test
     fun startListeningForUser_loadsNotifications_andUpdatesUnreadCount() = runTest {
-        // Arrange
+        // Fake notification data returned by the repository listener.
         val fakeNotifications = listOf(
             AppNotification(
                 id = "n1",
@@ -73,6 +76,7 @@ class NotificationViewModelTest {
                 onChanged: (List<AppNotification>) -> Unit,
                 onError: (Exception) -> Unit
             ) {
+                // Simulate a repository listener immediately returning data.
                 onChanged(fakeNotifications)
             }
 
@@ -101,19 +105,21 @@ class NotificationViewModelTest {
 
         val viewModel = NotificationViewModel(fakeRepository)
 
-        // Act
         viewModel.startListeningForUser("user1")
         advanceUntilIdle()
 
-        // Assert
+        // Notifications should be sorted newest first by createdAt.
         assertEquals(3, viewModel.notifications.size)
+        assertEquals("n3", viewModel.notifications[0].id)
+        assertEquals("n2", viewModel.notifications[1].id)
+        assertEquals("n1", viewModel.notifications[2].id)
+
+        // Two of the three notifications are unread.
         assertEquals(2, viewModel.unreadCount)
     }
 
-
     @Test
     fun markAsRead_marksNotificationAsRead_andUpdatesUnreadCount() = runTest {
-        // Arrange
         var markedId: String? = null
 
         val fakeRepository = object : NotificationRepository {
@@ -140,6 +146,7 @@ class NotificationViewModelTest {
             ) {}
 
             override suspend fun markAsRead(notificationId: String) {
+                // Capture which id the ViewModel asked the repository to mark as read.
                 markedId = notificationId
             }
 
@@ -151,32 +158,10 @@ class NotificationViewModelTest {
         }
 
         val viewModel = NotificationViewModel(fakeRepository)
-
-        viewModel.notifications.addAll(
-            listOf(
-                AppNotification(
-                    id = "n1",
-                    title = "New message",
-                    message = "Unread notification",
-                    type = NotificationType.MESSAGE,
-                    isRead = false,
-                    userId = "user1"
-                ),
-                AppNotification(
-                    id = "n2",
-                    title = "Task assigned",
-                    message = "Already read",
-                    type = NotificationType.TASK_ASSIGNED,
-                    isRead = true,
-                    userId = "user1"
-                )
-            )
-        )
-
         viewModel.startListeningForUser("user1")
         advanceUntilIdle()
 
-        // Reset state after listener to make test explicit
+        // Seed the ViewModel with a mix of unread and already-read notifications.
         viewModel.notifications.clear()
         viewModel.notifications.addAll(
             listOf(
@@ -198,38 +183,11 @@ class NotificationViewModelTest {
                 )
             )
         )
-        // force recount through a user action path
-        viewModel.markAsRead("n2")
-        advanceUntilIdle()
 
-        // Restore n1 unread for actual test scenario
-        viewModel.notifications.clear()
-        viewModel.notifications.addAll(
-            listOf(
-                AppNotification(
-                    id = "n1",
-                    title = "New message",
-                    message = "Unread notification",
-                    type = NotificationType.MESSAGE,
-                    isRead = false,
-                    userId = "user1"
-                ),
-                AppNotification(
-                    id = "n2",
-                    title = "Task assigned",
-                    message = "Already read",
-                    type = NotificationType.TASK_ASSIGNED,
-                    isRead = true,
-                    userId = "user1"
-                )
-            )
-        )
-        // recalculate by marking unread one
-        // Act
         viewModel.markAsRead("n1")
         advanceUntilIdle()
 
-        // Assert
+        // The local state should reflect the change immediately after the operation completes.
         assertEquals(true, viewModel.notifications.first { it.id == "n1" }.isRead)
         assertEquals(0, viewModel.unreadCount)
         assertEquals("n1", markedId)
@@ -237,7 +195,6 @@ class NotificationViewModelTest {
 
     @Test
     fun markAllAsRead_marksEverythingRead_andResetsUnreadCount() = runTest {
-        // Arrange
         var markedAllForUserId: String? = null
 
         val fakeRepository = object : NotificationRepository {
@@ -266,6 +223,7 @@ class NotificationViewModelTest {
             override suspend fun markAsRead(notificationId: String) {}
 
             override suspend fun markAllAsRead(userId: String) {
+                // Capture the user id used for the bulk mark-as-read action.
                 markedAllForUserId = userId
             }
 
@@ -278,6 +236,7 @@ class NotificationViewModelTest {
         viewModel.startListeningForUser("user1")
         advanceUntilIdle()
 
+        // Start with two unread notifications and one already-read notification.
         viewModel.notifications.clear()
         viewModel.notifications.addAll(
             listOf(
@@ -308,20 +267,17 @@ class NotificationViewModelTest {
             )
         )
 
-        // Act
         viewModel.markAllAsRead()
         advanceUntilIdle()
 
-        // Assert
+        // Everything should now be marked read, both visually and in unread count.
         assertEquals(true, viewModel.notifications.all { it.isRead })
         assertEquals(0, viewModel.unreadCount)
         assertEquals("user1", markedAllForUserId)
     }
 
-
     @Test
     fun deleteNotification_removesItem_updatesUnreadCount_andCallsRepository() = runTest {
-        // Arrange
         var deletedId: String? = null
 
         val fakeRepository = object : NotificationRepository {
@@ -354,6 +310,7 @@ class NotificationViewModelTest {
             override suspend fun unreadCount(userId: String): Int = 0
 
             override suspend fun deleteNotification(notificationId: String) {
+                // Capture the id so we can verify the correct notification was deleted.
                 deletedId = notificationId
             }
         }
@@ -362,6 +319,7 @@ class NotificationViewModelTest {
         viewModel.startListeningForUser("user1")
         advanceUntilIdle()
 
+        // One unread and one read notification before deletion.
         viewModel.notifications.clear()
         viewModel.notifications.addAll(
             listOf(
@@ -384,11 +342,10 @@ class NotificationViewModelTest {
             )
         )
 
-        // Act
         viewModel.deleteNotification("n1")
         advanceUntilIdle()
 
-        // Assert
+        // After deleting the unread item, only the read one should remain.
         assertEquals(1, viewModel.notifications.size)
         assertEquals("n2", viewModel.notifications[0].id)
         assertEquals(0, viewModel.unreadCount)
@@ -396,9 +353,8 @@ class NotificationViewModelTest {
     }
 
     @Test
-    fun addMessageNotification_forActiveUser_addsLocalNotification_andUpdatesUnreadCount() = runTest {
-        // Arrange
-        var onDoneCalled = false
+    fun onNotificationsOpened_marksAllLocalNotificationsAsRead_andResetsUnreadCount() = runTest {
+        var markedAllForUserId: String? = null
 
         val fakeRepository = object : NotificationRepository {
             override suspend fun getNotifications(userId: String): List<AppNotification> = emptyList()
@@ -425,7 +381,10 @@ class NotificationViewModelTest {
 
             override suspend fun markAsRead(notificationId: String) {}
 
-            override suspend fun markAllAsRead(userId: String) {}
+            override suspend fun markAllAsRead(userId: String) {
+                // Capture whether the ViewModel asked the repository to mark all notifications read.
+                markedAllForUserId = userId
+            }
 
             override suspend fun unreadCount(userId: String): Int = 0
 
@@ -436,23 +395,35 @@ class NotificationViewModelTest {
         viewModel.startListeningForUser("user1")
         advanceUntilIdle()
 
-        // Act
-        viewModel.addMessageNotification(
-            senderName = "Sara",
-            recipientUserId = "user1",
-            threadId = 99,
-            onDone = { onDoneCalled = true }
+        // Seed unread notifications to simulate opening the notifications screen.
+        viewModel.notifications.clear()
+        viewModel.notifications.addAll(
+            listOf(
+                AppNotification(
+                    id = "n1",
+                    title = "Unread 1",
+                    message = "Message 1",
+                    type = NotificationType.MESSAGE,
+                    isRead = false,
+                    userId = "user1"
+                ),
+                AppNotification(
+                    id = "n2",
+                    title = "Unread 2",
+                    message = "Message 2",
+                    type = NotificationType.TASK_ASSIGNED,
+                    isRead = false,
+                    userId = "user1"
+                )
+            )
         )
+
+        viewModel.onNotificationsOpened()
         advanceUntilIdle()
 
-        // Assert
-        assertEquals(1, viewModel.notifications.size)
-        assertEquals("New message", viewModel.notifications[0].title)
-        assertEquals("Sara sent you a message", viewModel.notifications[0].message)
-        assertEquals(NotificationType.MESSAGE, viewModel.notifications[0].type)
-        assertEquals(99, viewModel.notifications[0].relatedThreadId)
-        assertEquals(false, viewModel.notifications[0].isRead)
-        assertEquals(1, viewModel.unreadCount)
-        assertEquals(true, onDoneCalled)
+        // Opening the screen should clear unread state locally and in the repository layer.
+        assertEquals(true, viewModel.notifications.all { it.isRead })
+        assertEquals(0, viewModel.unreadCount)
+        assertEquals("user1", markedAllForUserId)
     }
 }

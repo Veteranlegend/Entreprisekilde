@@ -59,6 +59,18 @@ import com.entreprisekilde.app.ui.components.AppBottomNavBar
 import com.entreprisekilde.app.ui.components.BottomNavDestination
 import kotlin.math.roundToInt
 
+/**
+ * Admin messages overview screen.
+ *
+ * This screen shows:
+ * - a searchable list of message threads
+ * - unread indicators
+ * - swipe-to-delete interaction for each thread
+ * - a floating action button for starting a new chat
+ *
+ * The actual message thread content is handled elsewhere. This screen is mainly
+ * the "inbox" / conversation list view.
+ */
 @Composable
 fun MessagesScreen(
     threads: List<MessageThread>,
@@ -71,8 +83,11 @@ fun MessagesScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // Local search state used to filter the visible thread list.
     var searchText by remember { mutableStateOf("") }
 
+    // Filter threads by recipient name or last message text.
+    // Search is case-insensitive for a more forgiving UI experience.
     val filteredThreads = threads.filter {
         searchText.isBlank() ||
                 it.recipientName.contains(searchText, ignoreCase = true) ||
@@ -88,6 +103,7 @@ fun MessagesScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+            // Top app bar area
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -141,6 +157,7 @@ fun MessagesScreen(
                     .weight(1f)
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
+                // Search field for narrowing down the visible threads.
                 OutlinedTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
@@ -164,6 +181,8 @@ fun MessagesScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Thread list.
+                // Each item supports swipe-to-reveal delete action.
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
@@ -177,16 +196,19 @@ fun MessagesScreen(
                 }
             }
 
+            // Bottom navigation shared with the rest of the app.
             AppBottomNavBar(
                 selectedItem = BottomNavDestination.MESSAGES,
                 unreadNotificationCount = unreadNotificationCount,
                 onHomeClick = onHomeClick,
+                // Already on the messages screen, so we keep this as a no-op.
                 onMessagesClick = {},
                 onNotificationsClick = onNotificationsClick,
                 onProfileClick = onProfileClick
             )
         }
 
+        // Floating "new chat" button positioned above the bottom nav bar.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -207,16 +229,33 @@ fun MessagesScreen(
     }
 }
 
+/**
+ * Message thread card with swipe-to-reveal delete action.
+ *
+ * Interaction behavior:
+ * - swipe left to reveal delete area
+ * - tap delete area to open confirmation dialog
+ * - tap card while closed to open thread
+ * - tap card while open to close it again
+ *
+ * Each card remembers its own swipe state based on [thread.id].
+ */
 @Composable
 private fun SwipeToRevealThreadCard(
     thread: MessageThread,
     onClick: () -> Unit,
     onDeleteConfirmed: () -> Unit
 ) {
+    // Max distance the card can slide left to reveal the delete action.
     val maxRevealPx = 160f
+
+    // Current raw drag position for this card.
     var dragOffset by remember(thread.id) { mutableFloatStateOf(0f) }
+
+    // Controls the confirmation dialog visibility.
     var showDeleteDialog by remember(thread.id) { mutableStateOf(false) }
 
+    // Animate the offset so opening/closing feels smoother.
     val animatedOffset by animateFloatAsState(
         targetValue = dragOffset,
         label = "thread_swipe_offset"
@@ -267,6 +306,7 @@ private fun SwipeToRevealThreadCard(
             .fillMaxWidth()
             .height(92.dp)
     ) {
+        // Background delete action that becomes visible when the card slides left.
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -291,12 +331,14 @@ private fun SwipeToRevealThreadCard(
             }
         }
 
+        // Foreground card content that slides horizontally on drag.
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .offset { IntOffset(animatedOffset.roundToInt(), 0) }
                 .background(Color.White, RoundedCornerShape(18.dp))
                 .then(
+                    // Unread threads get a border so they stand out more in the list.
                     if (thread.unreadCount > 0) {
                         Modifier.border(1.dp, Color.Black, RoundedCornerShape(18.dp))
                     } else {
@@ -306,9 +348,12 @@ private fun SwipeToRevealThreadCard(
                 .pointerInput(thread.id) {
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, dragAmount ->
+                            // Allow swipe only within the supported range:
+                            // 0f = fully closed, -maxRevealPx = fully revealed.
                             dragOffset = (dragOffset + dragAmount).coerceIn(-maxRevealPx, 0f)
                         },
                         onDragEnd = {
+                            // Snap open or closed depending on how far the user dragged.
                             dragOffset = if (dragOffset < -maxRevealPx / 2f) {
                                 -maxRevealPx
                             } else {
@@ -319,14 +364,17 @@ private fun SwipeToRevealThreadCard(
                 }
                 .clickable {
                     if (dragOffset == 0f) {
+                        // Normal click behavior when card is closed.
                         onClick()
                     } else {
+                        // If currently swiped open, a tap closes it instead of opening the chat.
                         dragOffset = 0f
                     }
                 }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Avatar / user icon
             Box(
                 modifier = Modifier
                     .size(46.dp)
@@ -355,6 +403,7 @@ private fun SwipeToRevealThreadCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // Human-friendly relative timestamp for last activity in the thread.
                 Text(
                     text = formatTimeAgo(thread.updatedAt),
                     fontSize = 14.sp,
@@ -362,6 +411,7 @@ private fun SwipeToRevealThreadCard(
                 )
             }
 
+            // Unread counter badge shown only when there are unread messages.
             if (thread.unreadCount > 0) {
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -383,6 +433,18 @@ private fun SwipeToRevealThreadCard(
     }
 }
 
+/**
+ * Converts a timestamp into a short relative time label.
+ *
+ * Examples:
+ * - "Just now"
+ * - "5 min ago"
+ * - "3 h ago"
+ * - "2 d ago"
+ * - "1 w ago"
+ *
+ * Returns an empty string for invalid/non-positive timestamps.
+ */
 private fun formatTimeAgo(timestamp: Long): String {
     if (timestamp <= 0L) return ""
 

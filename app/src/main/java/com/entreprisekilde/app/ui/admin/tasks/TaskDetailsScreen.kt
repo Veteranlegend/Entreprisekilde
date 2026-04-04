@@ -74,6 +74,21 @@ import com.entreprisekilde.app.ui.components.BottomNavDestination
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+/**
+ * Task details screen used to view and edit a task.
+ *
+ * This screen lets the user:
+ * - edit the main task information
+ * - open the task address in maps
+ * - change the task date
+ * - reassign the task
+ * - review images added at creation time
+ * - add and review extra images uploaded later
+ * - save the edited task
+ *
+ * The composable is mostly UI/state handling. Actual persistence is delegated
+ * upward through [onSaveEdit] and [onAddImages].
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TaskDetailsScreen(
@@ -89,21 +104,49 @@ fun TaskDetailsScreen(
     onProfileClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
+
+    // We keep one formatter around for consistent dd/MM/yyyy display formatting.
     val displayFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
+    /**
+     * Local editable state for each task field.
+     *
+     * Using remember(task.id) means the form resets correctly when a different
+     * task is opened, while still preserving local edits during recomposition.
+     */
     var customer by remember(task.id) { mutableStateOf(task.customer) }
     var phoneNumber by remember(task.id) { mutableStateOf(task.phoneNumber) }
     var address by remember(task.id) { mutableStateOf(task.address) }
     var date by remember(task.id) { mutableStateOf(normalizeDateForDisplay(task.date)) }
     var assignTo by remember(task.id) { mutableStateOf(task.assignTo) }
     var taskDetails by remember(task.id) { mutableStateOf(task.taskDetails) }
+
+    // Controls dropdown visibility for the "Assign To" selector.
     var assignToExpanded by remember { mutableStateOf(false) }
+
+    // Dialog state for save confirmation.
     var showSavedDialog by remember { mutableStateOf(false) }
+
+    // Dialog state shown when no maps app/browser fallback can be opened.
     var showMapsErrorDialog by remember { mutableStateOf(false) }
 
+    /**
+     * Keeps track of any newly selected image Uris.
+     *
+     * This list is not currently rendered directly, but it can still be useful
+     * for future preview/temporary state needs. Right now the actual add action
+     * is immediately passed upward through [onAddImages].
+     */
     val selectedNewImageUris = remember { mutableStateListOf<Uri>() }
+
+    // When non-null, we show an image preview dialog for the selected image URL.
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
 
+    /**
+     * Split images into two groups so the UI can present them more clearly:
+     * - images attached when the task was originally created
+     * - images uploaded later from the details screen
+     */
     val createdImages = remember(task.images) {
         task.images.filter { it.source == TaskImageSource.CREATED }
     }
@@ -112,6 +155,12 @@ fun TaskDetailsScreen(
         task.images.filter { it.source == TaskImageSource.DETAILS }
     }
 
+    /**
+     * Image picker launcher for adding more detail/progress images.
+     *
+     * We allow multiple image selection here since users may want to upload
+     * several progress photos in one action.
+     */
     val addImagesLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
@@ -122,8 +171,20 @@ fun TaskDetailsScreen(
         }
     }
 
+    /**
+     * Figure out which date the date picker should open on.
+     *
+     * If the current value cannot be parsed for any reason, we fall back to today
+     * instead of crashing or showing a broken dialog.
+     */
     val initialDate = parseToLocalDate(date) ?: LocalDate.now()
 
+    /**
+     * Android platform date picker dialog.
+     *
+     * We wrap it in remember(initialDate) so it is recreated when the current
+     * editable date meaningfully changes.
+     */
     val datePickerDialog = remember(initialDate) {
         DatePickerDialog(
             context,
@@ -136,13 +197,18 @@ fun TaskDetailsScreen(
             initialDate.dayOfMonth
         ).apply {
             try {
+                // Prefer the calendar-style picker over spinners when possible.
                 datePicker.calendarViewShown = true
                 datePicker.spinnersShown = false
             } catch (_: Exception) {
+                // Some device implementations may not support these tweaks.
             }
         }
     }
 
+    /**
+     * Simple success dialog shown after saving task changes.
+     */
     if (showSavedDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -166,6 +232,9 @@ fun TaskDetailsScreen(
         )
     }
 
+    /**
+     * Error dialog shown if we fail to open maps and also fail the browser fallback.
+     */
     if (showMapsErrorDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -189,6 +258,12 @@ fun TaskDetailsScreen(
         )
     }
 
+    /**
+     * Full-screen-ish image preview dialog for whichever task image was tapped.
+     *
+     * We also expose a simple "Download / Open" button which hands the URL off
+     * to the system so the user can view/download it externally.
+     */
     selectedImageUrl?.let { imageUrl ->
         AlertDialog(
             onDismissRequest = { selectedImageUrl = null },
@@ -232,6 +307,9 @@ fun TaskDetailsScreen(
             .background(Color(0xFFF7F7F7))
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        /**
+         * Header row for the screen.
+         */
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -274,6 +352,9 @@ fun TaskDetailsScreen(
             }
         }
 
+        /**
+         * Main scrollable form content.
+         */
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -300,6 +381,14 @@ fun TaskDetailsScreen(
                 onValueChange = { address = it }
             )
 
+            /**
+             * Opens the current address in a maps app.
+             *
+             * Strategy:
+             * 1. Try a geo: intent first (best for installed maps apps)
+             * 2. Fall back to Google Maps in the browser
+             * 3. If both fail, show an error dialog
+             */
             Button(
                 onClick = {
                     val cleanAddress = address.trim()
@@ -379,6 +468,9 @@ fun TaskDetailsScreen(
                 minLines = 4
             )
 
+            /**
+             * Read-only section for images originally attached during task creation.
+             */
             TaskImagesSection(
                 title = "Created Images",
                 subtitle = "Images added when the task was created",
@@ -389,6 +481,12 @@ fun TaskDetailsScreen(
                 }
             )
 
+            /**
+             * Section for images uploaded later from the task details workflow.
+             *
+             * This one exposes an "Add" button because these images are expected
+             * to be updated over time.
+             */
             TaskImagesSection(
                 title = "Uploaded Later",
                 subtitle = "Images added from task details",
@@ -407,6 +505,12 @@ fun TaskDetailsScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            /**
+             * Save button.
+             *
+             * We trim all editable text values before saving so we do not
+             * accidentally persist leading/trailing whitespace.
+             */
             Button(
                 onClick = {
                     onSaveEdit(
@@ -449,6 +553,12 @@ fun TaskDetailsScreen(
     }
 }
 
+/**
+ * Reusable labeled text field used throughout the task form.
+ *
+ * This keeps the form layout consistent and avoids repeating the same styling
+ * for every field.
+ */
 @Composable
 private fun SmallField(
     label: String,
@@ -488,6 +598,13 @@ private fun SmallField(
     }
 }
 
+/**
+ * Read-only field that behaves like a date picker trigger.
+ *
+ * We render it as an OutlinedTextField for visual consistency with the rest of
+ * the form, then place a transparent clickable overlay on top so the whole field
+ * behaves like a picker button.
+ */
 @Composable
 private fun DateSelectorField(
     label: String,
@@ -529,6 +646,8 @@ private fun DateSelectorField(
                 )
             )
 
+            // Invisible overlay so the whole field is tappable without showing
+            // text-field editing behavior/cursor.
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -541,6 +660,12 @@ private fun DateSelectorField(
     }
 }
 
+/**
+ * Read-only dropdown selector for assigning the task to a user.
+ *
+ * Like [DateSelectorField], it uses a text-field look for visual consistency
+ * while behaving like a picker.
+ */
 @Composable
 private fun AssignToSelectorField(
     label: String,
@@ -586,6 +711,7 @@ private fun AssignToSelectorField(
                 )
             )
 
+            // Invisible overlay to make the whole field open the dropdown.
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -610,6 +736,17 @@ private fun AssignToSelectorField(
     }
 }
 
+/**
+ * Reusable image section used for both:
+ * - created images
+ * - images uploaded later
+ *
+ * It supports:
+ * - title/subtitle
+ * - empty state
+ * - optional "Add" button
+ * - clickable image thumbnails
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TaskImagesSection(
@@ -686,6 +823,10 @@ private fun TaskImagesSection(
                 )
             }
         } else {
+            /**
+             * FlowRow works well here because it creates a neat wrapping thumbnail
+             * grid without forcing us into a fixed-column layout.
+             */
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -708,6 +849,8 @@ private fun TaskImagesSection(
                             contentScale = ContentScale.Crop
                         )
 
+                        // For later-uploaded images, show who uploaded the image
+                        // when that information is available.
                         if (image.source == TaskImageSource.DETAILS && image.uploadedByName.isNotBlank()) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -723,6 +866,16 @@ private fun TaskImagesSection(
     }
 }
 
+/**
+ * Parses a raw date string into [LocalDate].
+ *
+ * Supported formats:
+ * - dd/MM/yyyy
+ * - yyyy-MM-dd
+ *
+ * Returning null instead of throwing keeps this helper safe to use anywhere in
+ * the UI layer.
+ */
 private fun parseToLocalDate(date: String): LocalDate? {
     val inputFormats = listOf(
         DateTimeFormatter.ofPattern("dd/MM/yyyy"),
@@ -733,12 +886,19 @@ private fun parseToLocalDate(date: String): LocalDate? {
         try {
             return LocalDate.parse(date, formatter)
         } catch (_: Exception) {
+            // Try the next known format.
         }
     }
 
     return null
 }
 
+/**
+ * Normalizes a date string to the app's preferred display format: dd/MM/yyyy.
+ *
+ * If parsing fails, we return the original value unchanged rather than risking
+ * data loss or a crash.
+ */
 private fun normalizeDateForDisplay(date: String): String {
     val parsed = parseToLocalDate(date) ?: return date
     return parsed.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))

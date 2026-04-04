@@ -46,6 +46,18 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+/**
+ * Admin calendar screen.
+ *
+ * This screen shows a month-view calendar and highlights the dates that have tasks.
+ * When a highlighted day is tapped, we pass the selected date back through [onDayClick].
+ *
+ * UI responsibilities:
+ * - show current month/year
+ * - allow moving between months
+ * - visually highlight days that contain tasks
+ * - provide bottom navigation + back navigation
+ */
 @Composable
 fun CalendarScreen(
     tasks: List<TaskData>,
@@ -57,18 +69,25 @@ fun CalendarScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // Keeps track of the month currently displayed in the calendar.
+    // `remember` makes sure this survives recomposition while the screen is alive.
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
 
+    // Convert task date strings into LocalDate values so the calendar can compare them.
+    // `toSet()` makes lookups fast and also removes duplicates automatically.
     val taskDates = tasks
         .mapNotNull { task ->
             parseTaskDate(task.date)
         }
         .toSet()
 
+    // Basic month metadata used to build the calendar grid.
     val firstDayOfMonth = currentMonth.atDay(1)
     val daysInMonth = currentMonth.lengthOfMonth()
     val startOffset = firstDayOffset(firstDayOfMonth.dayOfWeek)
 
+    // Build a list of cells for the month grid.
+    // We insert leading nulls so the first real day lands in the correct weekday column.
     val monthCells = buildList<LocalDate?> {
         repeat(startOffset) { add(null) }
         for (day in 1..daysInMonth) {
@@ -82,6 +101,7 @@ fun CalendarScreen(
             .background(Color(0xFFF7F7F7))
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        // Top header bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -109,6 +129,7 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Decorative calendar icon on the right side of the header.
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -124,6 +145,7 @@ fun CalendarScreen(
             }
         }
 
+        // Main calendar card
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -132,6 +154,7 @@ fun CalendarScreen(
                 .background(Color.White, RoundedCornerShape(20.dp))
                 .padding(horizontal = 16.dp, vertical = 18.dp)
         ) {
+            // Month navigation row
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -175,6 +198,8 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
+            // Weekday labels shown at the top of the calendar grid.
+            // Order here is Sunday -> Saturday, so our offset logic must match that.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -195,6 +220,7 @@ fun CalendarScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Split the month cells into week rows of 7 days each.
             monthCells.chunked(7).forEach { week ->
                 Row(
                     modifier = Modifier
@@ -208,12 +234,16 @@ fun CalendarScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (date == null) {
+                                // Empty placeholder for the leading/trailing cells
+                                // that belong to the previous/next month.
                                 Box(modifier = Modifier.size(42.dp))
                             } else {
+                                // A date is considered "active" if one or more tasks exist on that day.
                                 val hasTasks = taskDates.contains(date)
 
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
+                                    // Only allow clicking dates that actually have tasks.
                                     modifier = Modifier.clickable(enabled = hasTasks) {
                                         onDayClick(formatDateForTask(date))
                                     }
@@ -237,6 +267,8 @@ fun CalendarScreen(
 
                                     Spacer(modifier = Modifier.height(4.dp))
 
+                                    // Small dot indicator below the day number.
+                                    // We show it only when the date has tasks.
                                     Box(
                                         modifier = Modifier
                                             .size(5.dp)
@@ -250,6 +282,8 @@ fun CalendarScreen(
                         }
                     }
 
+                    // If the last week has fewer than 7 cells, fill the remaining space
+                    // so the row layout stays aligned with the rest of the calendar.
                     if (week.size < 7) {
                         repeat(7 - week.size) {
                             Box(
@@ -264,6 +298,7 @@ fun CalendarScreen(
             }
         }
 
+        // Bottom navigation used throughout the app.
         AppBottomNavBar(
             selectedItem = BottomNavDestination.HOME,
             unreadNotificationCount = unreadNotificationCount,
@@ -275,6 +310,18 @@ fun CalendarScreen(
     }
 }
 
+/**
+ * Attempts to parse a task date string into [LocalDate].
+ *
+ * We support multiple formats because task data may come from different sources
+ * or older parts of the app using different date formats.
+ *
+ * Supported:
+ * - dd/MM/yyyy
+ * - yyyy-MM-dd
+ *
+ * Returns null if none of the supported formats match.
+ */
 private fun parseTaskDate(date: String): LocalDate? {
     val supportedFormats = listOf(
         DateTimeFormatter.ofPattern("dd/MM/yyyy"),
@@ -285,16 +332,28 @@ private fun parseTaskDate(date: String): LocalDate? {
         try {
             return LocalDate.parse(date, formatter)
         } catch (_: Exception) {
+            // Ignore parse failure and try the next supported format.
         }
     }
 
     return null
 }
 
+/**
+ * Formats a [LocalDate] into the task date format expected elsewhere in the app.
+ *
+ * Right now we standardize outgoing day selections as dd/MM/yyyy.
+ */
 private fun formatDateForTask(date: LocalDate): String {
     return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
 }
 
+/**
+ * Converts Java's [DayOfWeek] into a calendar start offset where:
+ * Sunday = 0, Monday = 1, ... Saturday = 6
+ *
+ * This is needed because the UI renders weekday headers starting with Sunday.
+ */
 private fun firstDayOffset(dayOfWeek: DayOfWeek): Int {
     return when (dayOfWeek) {
         DayOfWeek.SUNDAY -> 0

@@ -66,6 +66,20 @@ import com.entreprisekilde.app.data.model.messages.ChatMessage
 import com.entreprisekilde.app.data.model.messages.MessageThread
 import java.io.File
 
+/**
+ * Full chat/conversation screen.
+ *
+ * This screen handles:
+ * - rendering the message list
+ * - showing typing status
+ * - sending text messages
+ * - sending image messages from gallery or camera
+ * - marking messages as read when the chat is opened/updated
+ * - stopping typing state when the screen is left
+ *
+ * The actual message sending and state management are delegated upward through
+ * callbacks so this composable stays focused on UI behavior.
+ */
 @Composable
 fun ChatScreen(
     thread: MessageThread,
@@ -78,51 +92,104 @@ fun ChatScreen(
     onMarkAsRead: () -> Unit = {},
     onStopTyping: () -> Unit = {}
 ) {
+    // Local draft text currently typed by the user.
     var messageText by remember { mutableStateOf("") }
+
+    // Controls whether the "send image" dialog is visible.
     var showImageOptions by remember { mutableStateOf(false) }
+
+    // Temporary Uri used when the user chooses to take a photo with the camera.
+    // We need to create it before launching the camera intent so the camera app
+    // knows where to write the captured image.
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
     val context = LocalContext.current
+
+    // Controls scroll position for the chat list.
     val listState = rememberLazyListState()
 
+    /**
+     * Gallery picker launcher.
+     *
+     * Once the user picks an image, we close the dialog and pass the Uri upward.
+     */
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         showImageOptions = false
+
         if (uri != null) {
             onSendImage(uri)
         }
     }
 
+    /**
+     * Camera launcher.
+     *
+     * If the camera action succeeds, we send the previously created temp Uri
+     * upward as the image source.
+     */
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         val uri = pendingCameraUri
         showImageOptions = false
+
         if (success && uri != null) {
             onSendImage(uri)
         }
     }
 
+    /**
+     * Typing state is considered "other user is typing" if there is any typing
+     * user in the thread that is not the currently logged-in user.
+     */
     val isOtherUserTyping = thread.typingUserIds.any { it != loggedInUserId }
 
+    /**
+     * Whenever the message count changes or the thread changes:
+     * - mark messages as read
+     * - scroll to the latest message
+     *
+     * This keeps the chat experience feeling natural, especially when opening a
+     * conversation or receiving a new message while viewing it.
+     */
     LaunchedEffect(messages.size, thread.id) {
         onMarkAsRead()
+
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }
     }
 
+    /**
+     * When this screen leaves composition, make sure we clear typing state.
+     *
+     * This avoids "stuck typing..." indicators when the user backs out of chat.
+     */
     DisposableEffect(Unit) {
         onDispose {
             onStopTyping()
         }
     }
 
+    /**
+     * Find the most recent message sent by the logged-in user.
+     *
+     * We use this so only the last outgoing message shows a lightweight
+     * "Sent" / "Seen" status, which matches common chat UX patterns.
+     */
     val lastMyMessageId = messages
         .lastOrNull { it.senderId == loggedInUserId }
         ?.id
 
+    /**
+     * Image source dialog shown when the user taps the image button.
+     *
+     * Two options:
+     * - choose an image from gallery
+     * - take a new photo
+     */
     if (showImageOptions) {
         AlertDialog(
             onDismissRequest = { showImageOptions = false },
@@ -189,7 +256,10 @@ fun ChatScreen(
                     }
                 }
             },
+
+            // No explicit confirm action is needed because each row acts as the action.
             confirmButton = {},
+
             dismissButton = {
                 TextButton(
                     onClick = { showImageOptions = false }
@@ -207,8 +277,19 @@ fun ChatScreen(
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
             .windowInsetsPadding(WindowInsets.safeDrawing)
+
+            // Push content above the keyboard when typing.
             .imePadding()
     ) {
+        /**
+         * Top chat header.
+         *
+         * Shows:
+         * - back button
+         * - basic avatar placeholder
+         * - recipient name
+         * - typing indicator when relevant
+         */
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -218,6 +299,7 @@ fun ChatScreen(
         ) {
             IconButton(
                 onClick = {
+                    // Clear typing state before leaving the screen.
                     onStopTyping()
                     onBack()
                 }
@@ -262,6 +344,12 @@ fun ChatScreen(
             }
         }
 
+        /**
+         * Main message list.
+         *
+         * We key items by message ID so Compose can track them more reliably
+         * across recompositions and updates.
+         */
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -276,6 +364,9 @@ fun ChatScreen(
             ) { _, message ->
                 val isFromMe = message.senderId == loggedInUserId
                 val isLastMyMessage = message.id == lastMyMessageId
+
+                // We treat the message as "seen" if the other participant has
+                // this message in their read list.
                 val isSeenByOtherUser = thread.recipientId in message.readByUserIds
 
                 MessageBubble(
@@ -287,6 +378,14 @@ fun ChatScreen(
             }
         }
 
+        /**
+         * Bottom composer area.
+         *
+         * Contains:
+         * - image picker button
+         * - text input
+         * - send button
+         */
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -317,6 +416,9 @@ fun ChatScreen(
                 value = messageText,
                 onValueChange = {
                     messageText = it
+
+                    // Notify the parent layer so typing state or draft-related
+                    // logic can be handled outside the UI if needed.
                     onMessageTextChanged(it)
                 },
                 placeholder = { Text("Write a message...") },
@@ -340,9 +442,15 @@ fun ChatScreen(
                     )
                     .clickable {
                         val trimmed = messageText.trim()
+
                         if (trimmed.isNotBlank()) {
                             onSendMessage(trimmed)
+
+                            // Clear local draft after a successful send trigger.
                             messageText = ""
+
+                            // Also notify the parent that the field is now empty,
+                            // which is useful for turning off typing state.
                             onMessageTextChanged("")
                         }
                     },
@@ -358,6 +466,15 @@ fun ChatScreen(
     }
 }
 
+/**
+ * Renders a single chat bubble.
+ *
+ * Supports:
+ * - outgoing vs incoming alignment/colors
+ * - text messages
+ * - image messages
+ * - optional "Sent" / "Seen" status on the latest outgoing message
+ */
 @Composable
 private fun MessageBubble(
     message: ChatMessage,
@@ -421,6 +538,17 @@ private fun MessageBubble(
     }
 }
 
+/**
+ * Creates a temporary content Uri for capturing a photo from the camera.
+ *
+ * Why this helper exists:
+ * - camera capture APIs need a writable destination Uri ahead of time
+ * - using the cache directory avoids polluting permanent storage
+ * - FileProvider makes the file safely shareable with the camera app
+ *
+ * The generated file lives under:
+ * cache/chat_camera_images/
+ */
 private fun createImageUri(context: Context): Uri {
     val imagesDir = File(context.cacheDir, "chat_camera_images").apply {
         if (!exists()) mkdirs()

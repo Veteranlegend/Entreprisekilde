@@ -1,6 +1,5 @@
 package com.entreprisekilde.app.ui.admin.tasks
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+
 import android.app.DatePickerDialog
 import android.net.Uri
 import android.widget.DatePicker
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -71,6 +71,20 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
+/**
+ * Screen for creating a new task.
+ *
+ * This screen handles:
+ * - collecting task input from the admin
+ * - validating required fields
+ * - selecting a date
+ * - selecting an assigned employee
+ * - selecting one or more images
+ * - creating the final [TaskData] object
+ *
+ * The actual save/upload logic is not done here directly.
+ * Instead, we pass the created task + selected image URIs back through [onCreateTask].
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreateTaskScreen(
@@ -85,6 +99,7 @@ fun CreateTaskScreen(
 ) {
     val context = LocalContext.current
 
+    // Form state
     var customer by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
@@ -92,11 +107,16 @@ fun CreateTaskScreen(
     var assignTo by remember { mutableStateOf("") }
     var assignedUserId by remember { mutableStateOf("") }
     var taskDetails by remember { mutableStateOf("") }
+
+    // UI state
     var assignToExpanded by remember { mutableStateOf(false) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
+    // Holds the selected local image URIs before they are uploaded/saved.
     val selectedImageUris = remember { mutableStateListOf<Uri>() }
 
+    // Validation error messages for each field.
+    // Null means "no error".
     var customerError by remember { mutableStateOf<String?>(null) }
     var phoneNumberError by remember { mutableStateOf<String?>(null) }
     var addressError by remember { mutableStateOf<String?>(null) }
@@ -104,6 +124,7 @@ fun CreateTaskScreen(
     var assignToError by remember { mutableStateOf<String?>(null) }
     var taskDetailsError by remember { mutableStateOf<String?>(null) }
 
+    // Small style constants used across the screen.
     val headerColor = Color(0xFFE0A673)
     val buttonColor = Color(0xFFCFE0D0)
     val buttonTextColor = Color(0xFF3F6E48)
@@ -111,6 +132,13 @@ fun CreateTaskScreen(
     val calendar = remember { Calendar.getInstance() }
     val displayFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
+    /**
+     * Android photo picker launcher.
+     *
+     * We allow multiple image selection.
+     * Current behavior: when the user picks new images, we replace the old selection
+     * rather than append to it.
+     */
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
@@ -120,6 +148,14 @@ fun CreateTaskScreen(
         }
     }
 
+    /**
+     * Native Android date picker dialog.
+     *
+     * When a date is selected:
+     * - we format it as dd/MM/yyyy
+     * - store it in the form
+     * - clear any existing date validation error
+     */
     val datePickerDialog = remember {
         DatePickerDialog(
             context,
@@ -133,13 +169,21 @@ fun CreateTaskScreen(
             calendar.get(Calendar.DAY_OF_MONTH)
         ).apply {
             try {
+                // Prefer calendar view UI when supported by the device/theme.
                 datePicker.calendarViewShown = true
                 datePicker.spinnersShown = false
             } catch (_: Exception) {
+                // Some devices / theme combinations may not support these settings.
+                // If that happens, we silently keep the default picker behavior.
             }
         }
     }
 
+    /**
+     * Validates all form fields and sets field-specific error messages.
+     *
+     * Returns true only when the entire form is valid.
+     */
     fun validateFields(): Boolean {
         val digitsOnlyPhoneNumber = phoneNumber.filter { it.isDigit() }
 
@@ -187,6 +231,7 @@ fun CreateTaskScreen(
                 taskDetailsError == null
     }
 
+    // Success dialog shown after a task is created successfully.
     if (showSuccessDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -216,6 +261,7 @@ fun CreateTaskScreen(
             .background(Color(0xFFF7F7F7))
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        // Top header row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -258,6 +304,7 @@ fun CreateTaskScreen(
             }
         }
 
+        // Main form content
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -271,6 +318,8 @@ fun CreateTaskScreen(
                 value = customer,
                 onValueChange = {
                     customer = it
+
+                    // Clear the error as soon as the field becomes valid.
                     if (it.trim().isNotBlank()) customerError = null
                 },
                 errorMessage = customerError
@@ -280,7 +329,9 @@ fun CreateTaskScreen(
                 label = "Phone Number",
                 value = phoneNumber,
                 onValueChange = {
+                    // Keep only digits in this field.
                     phoneNumber = it.filter { character -> character.isDigit() }
+
                     if (phoneNumber.length >= 8) {
                         phoneNumberError = null
                     }
@@ -314,6 +365,9 @@ fun CreateTaskScreen(
                 onExpand = { assignToExpanded = true },
                 onDismiss = { assignToExpanded = false },
                 onSelect = { selectedUser ->
+                    // Save both the display name and the actual user ID.
+                    // This is useful because the UI shows a name, but the backend
+                    // usually needs a stable user ID.
                     assignTo = selectedUser.fullName
                     assignedUserId = selectedUser.id
                     assignToExpanded = false
@@ -352,6 +406,9 @@ fun CreateTaskScreen(
                 onClick = {
                     if (!validateFields()) return@Button
 
+                    // Build the task object using the current form data.
+                    // ID is left blank here because the repository/backend usually
+                    // generates it during save.
                     onCreateTask(
                         TaskData(
                             id = "",
@@ -368,6 +425,7 @@ fun CreateTaskScreen(
                         selectedImageUris.toList()
                     )
 
+                    // Reset form after successful create.
                     customer = ""
                     phoneNumber = ""
                     address = ""
@@ -378,6 +436,7 @@ fun CreateTaskScreen(
                     assignToExpanded = false
                     selectedImageUris.clear()
 
+                    // Clear any old validation state.
                     customerError = null
                     phoneNumberError = null
                     addressError = null
@@ -415,6 +474,15 @@ fun CreateTaskScreen(
     }
 }
 
+/**
+ * Reusable text input field used across the create-task form.
+ *
+ * Supports:
+ * - normal single-line text
+ * - multi-line text
+ * - keyboard type customization
+ * - inline error display
+ */
 @Composable
 private fun SmallField(
     label: String,
@@ -468,6 +536,12 @@ private fun SmallField(
     }
 }
 
+/**
+ * Read-only field that opens a date picker when tapped.
+ *
+ * We use a transparent clickable overlay instead of making the text field
+ * itself editable, so the user can only select valid dates through the picker.
+ */
 @Composable
 private fun DateSelectorField(
     label: String,
@@ -512,6 +586,7 @@ private fun DateSelectorField(
                 )
             )
 
+            // Invisible overlay that captures taps without showing ripple/field editing.
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -534,6 +609,13 @@ private fun DateSelectorField(
     }
 }
 
+/**
+ * Read-only dropdown field for selecting which employee the task should be assigned to.
+ *
+ * Stores both:
+ * - the visible name in the field
+ * - the real selected [User] object through [onSelect]
+ */
 @Composable
 private fun AssignToSelectorField(
     label: String,
@@ -582,6 +664,7 @@ private fun AssignToSelectorField(
                 )
             )
 
+            // Transparent overlay so the whole field opens the menu when tapped.
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -616,6 +699,17 @@ private fun AssignToSelectorField(
     }
 }
 
+/**
+ * Image selection field for task photos.
+ *
+ * Shows:
+ * - a button to open the image picker
+ * - number of selected images
+ * - a small clear button when images are selected
+ *
+ * This component only manages display + callbacks.
+ * The actual list of URIs is owned by the parent screen.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TaskImagesField(

@@ -27,6 +27,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Reusable bottom navigation bar used across the app.
+ *
+ * The selected item controls which tab is visually highlighted,
+ * and each click lambda is passed in from the parent screen so
+ * navigation logic stays outside of the UI component.
+ *
+ * We also support an unread notification count so the notifications
+ * tab can show a small badge when there is something new to see.
+ */
 @Composable
 fun AppBottomNavBar(
     selectedItem: BottomNavDestination,
@@ -39,7 +49,9 @@ fun AppBottomNavBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // White background keeps the nav bar visually separated from screen content.
             .background(Color.White)
+            // Adds safe spacing for devices with gesture navigation / system nav bars.
             .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -48,6 +60,7 @@ fun AppBottomNavBar(
         BottomNavItem(
             label = "Home",
             icon = Icons.Outlined.Home,
+            // Active tab is shown in black, inactive tabs use a softer gray.
             color = if (selectedItem == BottomNavDestination.HOME) Color.Black else Color(0xFF9F98AA),
             onClick = onHomeClick
         )
@@ -59,6 +72,7 @@ fun AppBottomNavBar(
             onClick = onMessagesClick
         )
 
+        // Notifications use a slightly different item so we can show the unread badge.
         NotificationBottomNavItem(
             label = "Notification",
             icon = Icons.Outlined.Inventory2,
@@ -76,6 +90,12 @@ fun AppBottomNavBar(
     }
 }
 
+/**
+ * Central list of supported bottom nav destinations.
+ *
+ * Keeping these as enum values makes selection logic cleaner
+ * and avoids relying on raw strings throughout the UI.
+ */
 enum class BottomNavDestination {
     HOME,
     MESSAGES,
@@ -83,6 +103,10 @@ enum class BottomNavDestination {
     PROFILE
 }
 
+/**
+ * Standard bottom nav item used for tabs that only need
+ * an icon and label with no badge or extra UI.
+ */
 @Composable
 private fun BottomNavItem(
     label: String,
@@ -93,6 +117,7 @@ private fun BottomNavItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            // Padding expands the touch target a bit and gives each item breathing room.
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .clickable { onClick() }
     ) {
@@ -110,6 +135,12 @@ private fun BottomNavItem(
     }
 }
 
+/**
+ * Specialized bottom nav item for notifications.
+ *
+ * This works just like the standard nav item, but adds a small
+ * unread badge on top of the icon whenever unreadCount is greater than 0.
+ */
 @Composable
 private fun NotificationBottomNavItem(
     label: String,
@@ -131,15 +162,18 @@ private fun NotificationBottomNavItem(
                 tint = color
             )
 
+            // Only show the badge when there are unread notifications.
             if (unreadCount > 0) {
                 Box(
                     modifier = Modifier
+                        // Anchors the badge to the top-right corner of the icon container.
                         .align(Alignment.TopEnd)
                         .size(16.dp)
                         .background(Color(0xFFE35B5B), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
+                        // Cap the visible count at 9+ so the badge stays compact.
                         text = if (unreadCount > 9) "9+" else unreadCount.toString(),
                         color = Color.White,
                         fontSize = 9.sp,

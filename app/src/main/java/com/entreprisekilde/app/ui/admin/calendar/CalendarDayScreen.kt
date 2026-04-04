@@ -49,6 +49,18 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+/**
+ * Screen that shows all tasks for one selected calendar day.
+ *
+ * Main responsibilities:
+ * - display the chosen date in a readable format
+ * - let the user search/filter tasks for that day
+ * - show the filtered results as clickable cards
+ * - keep the app's bottom navigation visible
+ *
+ * This screen assumes [tasksForDay] is already pre-filtered by date by the caller.
+ * The local search here is only for searching within that one day's task list.
+ */
 @Composable
 fun CalendarDayScreen(
     selectedDate: String,
@@ -60,8 +72,23 @@ fun CalendarDayScreen(
     onNotificationsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
+    // Local search text entered by the user.
     var searchQuery by remember { mutableStateOf("") }
 
+    /**
+     * Filter tasks in-memory based on the current search query.
+     *
+     * We search across several human-meaningful fields so the search feels useful:
+     * - customer
+     * - address
+     * - assignee
+     * - task details
+     * - raw enum name
+     * - display label for the task status
+     *
+     * That last part matters because users may type "In Progress" while the enum
+     * value is actually IN_PROGRESS.
+     */
     val filteredTasks = tasksForDay.filter { task ->
         searchQuery.isBlank() ||
                 task.customer.contains(searchQuery, ignoreCase = true) ||
@@ -76,8 +103,17 @@ fun CalendarDayScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
+
+            // Respect safe drawing insets so content does not collide with
+            // status bars, cutouts, or navigation areas.
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        /**
+         * Top bar / header section.
+         *
+         * This is custom instead of using a standard TopAppBar because the design
+         * clearly wants a more branded layout.
+         */
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -105,6 +141,7 @@ fun CalendarDayScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Decorative calendar icon on the right side of the header.
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -126,6 +163,10 @@ fun CalendarDayScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
+            /**
+             * Shows the chosen date in a more human-friendly format,
+             * e.g. "Monday 14 March 2026" instead of "14/03/2026".
+             */
             Text(
                 text = prettyDate(selectedDate),
                 fontSize = 20.sp,
@@ -135,6 +176,9 @@ fun CalendarDayScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            /**
+             * Search field for narrowing down tasks within the selected day.
+             */
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -154,6 +198,9 @@ fun CalendarDayScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            /**
+             * Simple result count so the user gets immediate feedback while typing.
+             */
             Text(
                 text = "${filteredTasks.size} Results",
                 fontSize = 15.sp,
@@ -162,6 +209,12 @@ fun CalendarDayScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            /**
+             * Scrollable list of matching tasks.
+             *
+             * Using LazyColumn here is the right choice because it scales better
+             * than a regular Column when the task list grows.
+             */
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -175,6 +228,13 @@ fun CalendarDayScreen(
             }
         }
 
+        /**
+         * Bottom navigation remains visible on this screen so users can quickly
+         * jump to other main sections of the app.
+         *
+         * HOME is selected here because this calendar screen appears to live
+         * under the home/admin flow.
+         */
         AppBottomNavBar(
             selectedItem = BottomNavDestination.HOME,
             onHomeClick = onHomeClick,
@@ -185,6 +245,16 @@ fun CalendarDayScreen(
     }
 }
 
+/**
+ * Small reusable card used to render one task inside the day view list.
+ *
+ * Visual behavior:
+ * - completed tasks use a green theme
+ * - non-completed tasks use an orange theme
+ *
+ * That color split gives users a quick visual status cue without needing to read
+ * every label.
+ */
 @Composable
 private fun CalendarTaskCard(
     task: TaskData,
@@ -213,6 +283,7 @@ private fun CalendarTaskCard(
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Small white dot for a little extra visual polish / structure.
             Box(
                 modifier = Modifier
                     .size(8.dp)
@@ -230,6 +301,12 @@ private fun CalendarTaskCard(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            /**
+             * Status chip on the right side.
+             *
+             * This uses a softer color than the card background so the status
+             * stays readable and visually separated.
+             */
             Box(
                 modifier = Modifier
                     .background(chipColor, RoundedCornerShape(50))
@@ -246,6 +323,11 @@ private fun CalendarTaskCard(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        /**
+         * Secondary metadata row:
+         * - task date
+         * - task address
+         */
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Outlined.Schedule,
@@ -282,6 +364,12 @@ private fun CalendarTaskCard(
     }
 }
 
+/**
+ * Converts a [TaskStatus] enum into a user-friendly label for the UI.
+ *
+ * This keeps display text centralized instead of scattering hardcoded labels
+ * across the screen.
+ */
 private fun taskStatusLabel(status: TaskStatus): String {
     return when (status) {
         TaskStatus.PENDING -> "Pending"
@@ -290,6 +378,19 @@ private fun taskStatusLabel(status: TaskStatus): String {
     }
 }
 
+/**
+ * Converts a raw date string into a friendlier display format.
+ *
+ * Supported input formats:
+ * - dd/MM/yyyy
+ * - yyyy-MM-dd
+ *
+ * Example output:
+ * - "Friday 14 March 2026"
+ *
+ * If parsing fails, we simply return the original value rather than crashing or
+ * showing a broken UI. That makes this helper very safe to use with mixed data.
+ */
 private fun prettyDate(date: String): String {
     val supportedFormats = listOf(
         DateTimeFormatter.ofPattern("dd/MM/yyyy"),
@@ -303,8 +404,10 @@ private fun prettyDate(date: String): String {
             val monthName = parsed.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
             return "$dayName ${parsed.dayOfMonth} $monthName ${parsed.year}"
         } catch (_: Exception) {
+            // Try the next supported format.
         }
     }
 
+    // Fall back to the raw input if none of the known formats match.
     return date
 }
